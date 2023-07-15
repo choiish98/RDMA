@@ -1,7 +1,5 @@
 #include "rdma_client.h"
 
-struct sockaddr_in cserver_sockaddr;
-
 struct ctrl *cctrl;
 struct ibv_comp_channel *io_completion_channel;
 struct rdma_event_channel *ec;
@@ -10,7 +8,7 @@ struct rdma_cm_id *cm_id;
 char client_memory[PAGE_SIZE]; 
 struct ibv_mr *client_mr;
 
-int queue_ctr = 0;
+static unsigned int queue_ctr = 0;
 
 static int rdma_create_device(struct queue *q)
 {
@@ -151,7 +149,7 @@ static int on_connection(struct queue *q)
 
 	ret = rdma_create_mr(q);
 	if (ret) {
-		printf("%s: client_init_mr failed\n", __func__);
+		printf("%s: rdma_create_mr failed\n", __func__);
 		return ret;
 	}
 
@@ -310,14 +308,4 @@ int client_disconnect_and_clean(int idx)
 
 	free(cctrl);
     return 0;
-}
-
-inline struct queue *get_cqueue(enum qp_type type)
-{
-	if (type < NUM_CLIENT_QUEUES) {
-		return &cctrl->queues[type];
-	} else {
-		printf("wrong rdma queue %d\n", type);
-		return &cctrl->queues[0];
-	}
 }
