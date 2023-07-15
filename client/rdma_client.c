@@ -74,7 +74,6 @@ static int rdma_create_queue(struct queue *q)
 		return ret;
 	}
 
-	printf("QP created \n");
 	return ret;
 }
 
@@ -99,6 +98,8 @@ static int on_addr_resolved(struct rdma_cm_id *id)
 {
 	struct queue *q = &cctrl->queues[queue_ctr++];
 	int ret; 
+
+	printf("%s\n", __func__);
 
 	id->context = q;
 	q->cm_id = id;
@@ -129,6 +130,8 @@ static int on_route_resolved(struct queue *q)
 	struct rdma_conn_param conn_param;
 	int ret;
 
+	printf("%s\n", __func__);
+
 	bzero(&conn_param, sizeof(conn_param));
 	conn_param.initiator_depth = 3;
 	conn_param.responder_resources = 3;
@@ -147,13 +150,14 @@ static int on_connection(struct queue *q)
 {
 	int ret;
 
+	printf("%s\n", __func__);
+
 	ret = rdma_create_mr(q);
 	if (ret) {
 		printf("%s: rdma_create_mr failed\n", __func__);
 		return ret;
 	}
 
-	printf("%s: The client is connected successsfully\n", __func__);
 	return 1;
 }
 
@@ -161,32 +165,45 @@ static int on_disconnect(struct queue *q)
 {
 	int ret; 
 
+	printf("%s\n", __func__);
+
+	ret = rdma_disconnect(q->cm_id);
+    if (ret) {
+        printf("%s: rdma_disconnect \n", __func__);
+		return ret;
+    }
+
     rdma_destroy_qp(q->cm_id);
     ret = rdma_destroy_id(q->cm_id);
     if (ret) {
         printf("%s: rdma_destroy_id failed\n", __func__);
+		return ret;
     }
 
     ret = ibv_destroy_cq(q->cq);
     if (ret) {
         printf("%s: ibv_destroy_cq failed\n", __func__);
+		return ret;
     }
 
 	if (io_completion_channel) {
 		ret = ibv_destroy_comp_channel(io_completion_channel);
 	    if (ret) {
 		    printf("%s: ibv_destroy_comp_channel failed\n", __func__);
+			return ret;
 	    }
 	}
 
-    ret = ibv_dealloc_pd(q->ctrl->dev->pd);
-    if (ret) {
-        printf("%s: ibv_dealloc_pd failed\n", __func__);
-    }
+	if (q->ctrl->dev->pd) {
+		ret = ibv_dealloc_pd(q->ctrl->dev->pd);
+	    if (!ret) {
+		    printf("%s: ibv_dealloc_pd failed\n", __func__);
+			return ret;
+	    }
+	}
 
-	if (q == get_cqueue(QP_STORE_NIC_REQ)) {
+	if (ec) {
 		rdma_destroy_event_channel(ec);
-		printf("Client resource clean up is complete \n");
 	}
 
 	return 1;
@@ -195,6 +212,7 @@ static int on_disconnect(struct queue *q)
 static int on_event(struct rdma_cm_event *event)
 {
 	struct queue *q = (struct queue *) event->id->context;
+	printf("%s\n", __func__);
 
 	switch (event->event) {
 		case RDMA_CM_EVENT_ADDR_RESOLVED:
@@ -204,12 +222,12 @@ static int on_event(struct rdma_cm_event *event)
 		case RDMA_CM_EVENT_ESTABLISHED:
 			return on_connection(q);
 		case RDMA_CM_EVENT_REJECTED:
-			printf("connect rejected \n");
+			printf("%s: RDMA_CM_EVENT_REJECTD\n", __func__);
 			return 1;
 		case RDMA_CM_EVENT_DISCONNECTED:
 			return on_disconnect(q);
 		default:
-			printf("unknown event: %s\n", rdma_event_str(event->event));
+			printf("%s: %s\n", __func__, rdma_event_str(event->event));
 			return 1;
 	}
 }
@@ -243,8 +261,6 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 	struct rdma_cm_event *event;
 	int ret;
 
-	printf("%s: start\n", __func__);
-
 	if (!cctrl) {
 		ret = alloc_control();
 		if (ret) {
@@ -270,7 +286,6 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 		printf("%s: rdma_resolve_addr failed\n", __func__);
 		return -EINVAL;
 	}
-	printf("rdma_resolve_addr requested now.\nwaiting for RDMA CM event\n");
 
 	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
@@ -278,34 +293,28 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 		memcpy(&event_copy, event, sizeof(*event));
 		rdma_ack_cm_event(event);
 
-		if (on_event(&event_copy))
+		if (on_event(&event_copy)) {
 			break;
+		}
 	}
 
 	return ret;
 }
 
-int client_disconnect_and_clean(int idx)
+int disconnect_rdma_client(void)
 {
-	struct queue *q = get_cqueue(idx);
-	struct rdma_cm_event *event;
-	int ret;
+	int i, ret;
 
-	ret = rdma_disconnect(q->cm_id);
-    if (ret) {
-        printf("%s: rdma_disconnect \n", __func__);
-    }
+	printf("%s\n", __func__);
 
-	while (!rdma_get_cm_event(ec, &event)) {
-		struct rdma_cm_event event_copy;
-
-		memcpy(&event_copy, event, sizeof(*event));
-		rdma_ack_cm_event(event);
-
-		if (on_event(&event_copy))
-			break;
+	for (i = 0; i < NUM_CLIENT_QUEUES; i++) {
+		ret = on_disconnect(&cctrl->queues[i]);
+		if (!ret) {
+			printf("%s: on_disconnect failed \n", __func__);
+			return ret;
+		}
 	}
 
 	free(cctrl);
-    return 0;
+	return ret;
 }

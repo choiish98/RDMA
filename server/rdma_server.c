@@ -141,14 +141,15 @@ static int on_connection(struct queue *q)
 {
 	int ret;
 
+	printf("%s\n", __func__);
+
 	ret = rdma_create_mr(q);
 	if (ret) {
 		printf("%s: rdma_create_mr failed\n", __func__);
 		return ret;
 	}
 
-	printf("%s: Ther server is connected successfully\n", __func__);
-	return 1;
+	return ret;
 }
 
 static int on_disconnect(struct queue *q)
@@ -175,6 +176,7 @@ int on_event(struct rdma_cm_event *event)
 		case RDMA_CM_EVENT_ESTABLISHED:
 			return on_connection(q);
 		case RDMA_CM_EVENT_DISCONNECTED:
+			printf("recv disconnect\n");
 			return on_disconnect(q);
 		default:
 			printf("unknown event: %s\n", rdma_event_str(event->event));
@@ -207,8 +209,6 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	struct rdma_cm_event *event;
 	int i, ret;
 
-	printf("%s: start\n", __func__);
-
 	ret = alloc_control();
 	if (ret) {
 		printf("%s: malloc queues failed\n", __func__);
@@ -237,16 +237,6 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	if (ret) {
 		printf("%s: rdma_listen failed\n", __func__);
 		return ret;
-	}
-
-	while (!rdma_get_cm_event(ec, &event)) {
-		struct rdma_cm_event event_copy;
-
-		memcpy(&event_copy, event, sizeof(*event));
-		rdma_ack_cm_event(event);
-
-		if (on_event(&event_copy))
-			break;
 	}
 
 	while (!rdma_get_cm_event(ec, &event)) {

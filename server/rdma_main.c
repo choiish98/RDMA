@@ -27,12 +27,8 @@ int main(int argc, char* argv[])
 	if (!s_addr.sin_port) usage();
 	s_addr.sin_family = AF_INET;
 
-	ret = start_rdma_server(s_addr);
-	if (ret) {
-		printf("%s: start_rdma_client failed\n", __func__);
-		return ret;
-	}
-
+	start_rdma_server(s_addr);
 	// server is running now.
+
 	return ret;
 }
