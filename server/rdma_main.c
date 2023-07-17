@@ -1,4 +1,4 @@
-#include "common.h"
+#include "rdma_common.h"
 #include "rdma_server.h"
 
 struct sockaddr_in s_addr;
@@ -21,14 +21,16 @@ int main(int argc, char* argv[])
 				break;
 			default:
 				usage();
+				break;
 		}
 	}
 
-	if (!s_addr.sin_port) usage();
+	if (!s_addr.sin_port) {
+		usage();
+		return ret;
+	}
 	s_addr.sin_family = AF_INET;
 
 	start_rdma_server(s_addr);
-	// server is running now.
-
 	return ret;
 }

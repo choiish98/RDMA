@@ -1,123 +1,42 @@
 #include "rdma_server.h"
 
-static unsigned int queue_ctr = 0;
-
-struct ctrl *gctrl;
-struct ibv_comp_channel *io_completion_channel;
+struct ctrl *server_session;
+struct ibv_comp_channel *cc;
 struct rdma_event_channel *ec;
 struct rdma_cm_id *listener;
+int queue_ctr = 0;
 
 char server_memory[PAGE_SIZE];
 struct ibv_mr *server_mr;
-
-static struct device *rdma_create_device(struct queue *q)
-{
-	struct device *dev = NULL;
-
-	if (!q->ctrl->dev) {
-		dev = (struct device *) malloc(sizeof(*dev));
-		if (!dev) {
-			printf("%s: malloc dev failed\n", __func__);
-			return NULL;
-		}
-
-		dev->verbs = q->cm_id->verbs;
-		dev->pd = ibv_alloc_pd(dev->verbs);
-		if (!dev->pd) {
-			printf("%s: ibv_allod_pd failed\n", __func__);
-			return NULL;
-		}
-
-		q->ctrl->dev = dev;
-	}
-
-	return q->ctrl->dev;
-}
-
-static int rdma_create_queue(struct queue *q)
-{
-	struct ibv_qp_init_attr qp_attr = {};
-	int ret;
-
-	if (!io_completion_channel) {
-		io_completion_channel = ibv_create_comp_channel(q->cm_id->verbs);
-		if (!io_completion_channel) {
-			printf("%s: ibv_create_comp_channel failed\n", __func__);
-			return -EINVAL;
-		}
-	}
-
-	q->cq = ibv_create_cq(q->cm_id->verbs,
-			CQ_CAPACITY,
-			NULL,
-			io_completion_channel,
-			0);
-	if (!q->cq) {
-		printf("%s: ibv_create_cq failed\n", __func__);
-		return -EINVAL;
-	}
-
-	qp_attr.send_cq = q->cq;
-	qp_attr.recv_cq = q->cq;
-	qp_attr.qp_type = IBV_QPT_RC;
-	qp_attr.cap.max_send_wr = 1024;
-	qp_attr.cap.max_recv_wr = 1024;
-	qp_attr.cap.max_send_sge = 1;
-	qp_attr.cap.max_recv_sge = 1;
-
-	ret = rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
-	if (ret) {
-		printf("%s: rdma_create_qp failed\n", __func__);
-		return ret;
-	}
-	q->qp = q->cm_id->qp;
-
-	return ret;
-}
-
-static int rdma_create_mr(struct queue *q)
-{
-	if (!server_mr) {
-		server_mr = ibv_reg_mr(
-					q->ctrl->dev->pd,
-					&server_memory,
-					sizeof(server_memory),
-					IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE);
-		if (!server_mr) {
-			printf("%s: ibv_reg_mr failed\n", __func__);
-			return -ENOMEM;
-		}
-	}
-
-	return 0;
-}
 
 static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *param)
 {
 	struct rdma_conn_param cm_params = {};
 	struct ibv_device_attr attrs = {};
-	struct queue *q = &gctrl->queues[queue_ctr++];
+	struct queue *q = &server_session->queues[queue_ctr++];
 	struct device *dev;
 	int ret;
 
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 
 	id->context = q;
 	q->cm_id = id;
 
-	dev = rdma_create_device(q);
-	if (!dev) {
-		printf("%s: rdma_create_device failed\n", __func__);
-		return -EINVAL;
+	if (!q->ctrl->dev) {
+		ret = rdma_create_device(q);
+		if (ret) {
+			printf("%s: rdma_create_device failed\n", __func__);
+			return -EINVAL;
+		}
 	}
 
-	ret = rdma_create_queue(q);
+	ret = rdma_create_queue(q, cc);
 	if (ret) {
 		printf("%s: rdma_create_queue failed\n", __func__);
 		return -EINVAL;
 	}
 
-	ret = ibv_query_device(dev->verbs, &attrs);
+	ret = ibv_query_device(q->ctrl->dev->verbs, &attrs);
 	if (ret) {
 		printf("%s: ibv_query_device failed\n", __func__);
 		return -EINVAL;
@@ -139,13 +58,31 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 
 static int on_connection(struct queue *q)
 {
+	struct mr_attr mr;
 	int ret;
 
 	printf("%s\n", __func__);
 
-	ret = rdma_create_mr(q);
+	ret = rdma_create_mr(server_session->dev->pd);
 	if (ret) {
 		printf("%s: rdma_create_mr failed\n", __func__);
+		return ret;
+	}
+
+	mr.addr = (uint64_t) server_mr->addr;
+	mr.length = sizeof(struct mr_attr);
+	mr.stag.lkey = server_mr->lkey;
+	memcpy(server_memory, &mr, sizeof(struct mr_attr));
+
+	ret = rdma_send_wr(q, IBV_WR_SEND, &mr, NULL);
+	if (ret) {
+		printf("%s: rdma_send_wr failed\n", __func__);
+		return ret;
+	}
+
+	ret = rdma_poll_cq(q->cq, 1);
+	if (ret) {
+		printf("%s: process_cq failed\n", __func__);
 		return ret;
 	}
 
@@ -154,21 +91,21 @@ static int on_connection(struct queue *q)
 
 static int on_disconnect(struct queue *q)
 {
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 
 	rdma_destroy_qp(q->cm_id);
 	rdma_destroy_id(q->cm_id);
 	rdma_destroy_event_channel(ec);
-	ibv_dealloc_pd(gctrl->dev->pd);
-	free(gctrl->dev);
-	gctrl->dev = NULL;
+	ibv_dealloc_pd(server_session->dev->pd);
+	free(server_session->dev);
+	server_session->dev = NULL;
 	return 1;
 }
 
-int on_event(struct rdma_cm_event *event)
+static int on_event(struct rdma_cm_event *event)
 {
 	struct queue *q = (struct queue *) event->id->context;
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 
 	switch (event->event) {
 		case RDMA_CM_EVENT_CONNECT_REQUEST:
@@ -184,32 +121,12 @@ int on_event(struct rdma_cm_event *event)
 	}
 }
 
-static int alloc_control(void)
-{
-	gctrl = (struct ctrl *) malloc(sizeof(struct ctrl));
-	if (!gctrl) {
-		printf("%s: malloc gctrl failed\n", __func__);
-		return -EINVAL;
-	}
-	memset(gctrl, 0, sizeof(struct ctrl));
-
-	gctrl->queues = (struct queue *) malloc(sizeof(struct queue) * NUM_QUEUES);
-	if (!gctrl->queues) {
-		printf("%s: malloc queues failed\n", __func__);
-		return -EINVAL;
-	}
-	memset(gctrl->queues, 0, sizeof(struct queue) * NUM_QUEUES);
-
-	gctrl->queues[0].ctrl = gctrl;
-	return 0;
-}
-
 int start_rdma_server(struct sockaddr_in s_addr)
 {
 	struct rdma_cm_event *event;
 	int i, ret;
 
-	ret = alloc_control();
+	ret = rdma_alloc_session(&server_session);
 	if (ret) {
 		printf("%s: malloc queues failed\n", __func__);
 		return -ret;

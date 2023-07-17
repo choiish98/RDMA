@@ -20,17 +20,16 @@
 #define true 1
 #define false 0
 
-#define CONNECTION_TIMEOUT_MS 2000
+#define NUM_QUEUES 1
 
-#define CQ_CAPACITY (128)
-#define MAX_SGE (32)
-#define MAX_WR (64)
+#define CONNECTION_TIMEOUT_MS 2000
+#define CQ_CAPACITY 128
 
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
 
-struct rdma_buffer_attr {
-	uint64_t address;
+struct mr_attr {
+	uint64_t addr;
 	uint64_t length;
 	union stag {
 		uint32_t lkey;
@@ -48,19 +47,23 @@ struct queue {
 	struct ibv_cq *cq;
 	struct rdma_cm_id *cm_id;
 	struct ctrl *ctrl;
-	enum {
-		INIT,
-		CONNECTED
-	} state;
 };
 
 struct ctrl {
 	struct queue *queues;
-	struct ibv_mr *mr_buffer;
-	void *buffer;
 	struct device *dev;
-
 	struct ibv_comp_channel *comp_channel;
+	struct mr_attr clientmr;
+	struct mr_attr servermr;
 };
 
+int rdma_alloc_session(struct ctrl **session);
+int rdma_create_device(struct queue *q);
+int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc);
+int rdma_create_mr(struct ibv_pd *pd);
+
+int rdma_poll_cq(struct ibv_cq *cq, int total);
+int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr);
+int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
+		struct mr_attr *sge_mr, struct mr_attr *wr_mr);
 #endif

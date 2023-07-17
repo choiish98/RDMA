@@ -6,7 +6,7 @@ cc := g++
 
 APP := rdma_main
 
-default: rdma_client.c rdma_main.c
+default: rdma_common.c rdma_client.c rdma_main.c
 	${CC} -o ${APP} $^ -DACN_RDMA_DEBUG ${LDLIBS}
 
 clean:

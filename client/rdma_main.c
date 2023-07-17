@@ -1,8 +1,8 @@
-#include "common.h"
+#include "rdma_common.h"
 #include "rdma_client.h"
 
 struct sockaddr_in s_addr;
-extern struct ctrl ccgrl; 
+extern struct ctrl client_session; 
 
 static inline int get_addr(char *sip)
 {
@@ -44,10 +44,14 @@ int main(int argc, char* argv[])
 				break;
 			default:
 				usage();
+				break;
 		}
 	}
 
-	if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) usage();
+	if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) {
+		usage();
+		return ret;
+	}
 
 	ret = start_rdma_client(&s_addr);
 	if (ret) {
