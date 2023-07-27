@@ -17,6 +17,22 @@
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
 
+#define RDMA_CLIENT
+
+#define TEST_NZ(x) do { \
+    if (x) { \
+        printf("%s: failed at %d \n", __func__, __LINE__); \
+        return x; \
+    } \
+} while(0)
+
+#define TEST_Z(x) do { \
+    if (!x) { \
+        printf("%s: failed at %d \n", __func__, __LINE__); \
+        return x; \
+    } \
+} while(0)
+
 #define true 1
 #define false 0
 

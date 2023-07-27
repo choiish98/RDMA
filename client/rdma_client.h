@@ -4,5 +4,6 @@
 #include "rdma_common.h"
 
 int start_rdma_client(struct sockaddr_in *s_addr);
-int disconnect_rdma_client(void);
+struct queue *get_queue(int idx);
+
 #endif

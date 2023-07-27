@@ -1,6 +1,6 @@
 #include "rdma_common.h"
 
-#ifdef _RDMA_CLIENT_H
+#ifdef RDMA_CLIENT
 const unsigned int MAX_SGE = 1024;
 const unsigned int MAX_WR = 1;
 extern char client_memory[PAGE_SIZE];

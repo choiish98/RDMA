@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -17,6 +18,20 @@
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
 
+#define TEST_NZ(x) do { \
+    if (x) { \
+        printf("%s: failed at %d \n", __func__, __LINE__); \
+        return x; \
+    } \
+} while(0)
+
+#define TEST_Z(x) do { \
+    if (!x) { \
+        printf("%s: failed at %d \n", __func__, __LINE__); \
+        return x; \
+    } \
+} while(0)
+
 #define true 1
 #define false 0
 
@@ -24,6 +39,9 @@
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128
+
+#define RDMA_INIT 0
+#define RDMA_CONNECT 1
 
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12

@@ -1,9 +1,9 @@
 #include "rdma_client.h"
 
 struct ctrl *client_session;
-struct ibv_comp_channel *cc;
-struct rdma_event_channel *ec;
-struct rdma_cm_id *cm_id;
+struct ibv_comp_channel *cc[NUM_QUEUES];
+struct rdma_event_channel *ec[NUM_QUEUES];
+struct rdma_cm_id *cm_id[NUM_QUEUES];
 int queue_ctr = 0;
 
 char client_memory[PAGE_SIZE]; 
@@ -11,138 +11,49 @@ struct ibv_mr *client_mr;
 
 static int on_addr_resolved(struct rdma_cm_id *id)
 {
-	struct queue *q = &client_session->queues[queue_ctr++];
-	int ret; 
-
+	struct queue *q = &client_session->queues[queue_ctr];
 	printf("%s\n", __func__);
 
 	id->context = q;
 	q->cm_id = id;
 
-	if (!q->ctrl->dev) {
-		ret = rdma_create_device(q);
-		if (ret) {
-			printf("%s: rdma_create_device failed\n", __func__);
-			return ret;
-		}
-	}
-
-	ret = rdma_create_queue(q, cc);
-	if (ret) {
-		printf("%s: rdma_create_queue failed\n", __func__);
-		return ret;
-	}
-
-	ret = rdma_resolve_route(q->cm_id, CONNECTION_TIMEOUT_MS);
-	if (ret) {
-		printf("%s: rdma_resolve_route failed\n", __func__);
-		return ret;
-	}
-
-	return ret;
+	if (!q->ctrl->dev) 
+		TEST_NZ(rdma_create_device(q));
+	TEST_NZ(rdma_create_queue(q, cc[queue_ctr++]));
+	TEST_NZ(rdma_resolve_route(q->cm_id, CONNECTION_TIMEOUT_MS));
+	return 0;
 }
 
 static int on_route_resolved(struct queue *q)
 {
-	struct rdma_conn_param conn_param;
-	int ret;
+	struct rdma_conn_param param = {};
 
 	printf("%s\n", __func__);
 
-	bzero(&conn_param, sizeof(conn_param));
-	conn_param.initiator_depth = 3;
-	conn_param.responder_resources = 3;
-	conn_param.retry_count = 3;
-
-	ret = rdma_connect(q->cm_id, &conn_param);
-	if (ret) {
-		printf("%s: rdma_connect failed\n", __func__);
-		return ret;
-	}
-
-	return ret;
+	param.qp_num = q->qp->qp_num;
+	param.initiator_depth = 16;
+	param.responder_resources = 16;
+	param.retry_count = 7;
+	param.rnr_retry_count = 7;
+	TEST_NZ(rdma_connect(q->cm_id, &param));
+	return 0;
 }
 
 static int on_connection(struct queue *q)
 {
 	struct mr_attr mr;
-	int ret;
 
 	printf("%s\n", __func__);
 
-	if (!client_mr) {
-		ret = rdma_create_mr(client_session->dev->pd);
-		if (ret) {
-			printf("%s: rdma_create_client_mr failed\n", __func__);
-			return ret;
-		}
+	TEST_NZ(rdma_create_mr(client_session->dev->pd));
 
-		mr.addr = (uint64_t) client_mr->addr;
-		mr.length = sizeof(struct mr_attr);
-		mr.stag.lkey = client_mr->lkey;
-		memcpy(client_memory, &mr, sizeof(struct mr_attr));
+	mr.addr = (uint64_t) client_mr->addr;
+	mr.length = sizeof(struct mr_attr);
+	mr.stag.lkey = client_mr->lkey;
+	memcpy(client_memory, &mr, sizeof(struct mr_attr));
 	
-		ret = rdma_recv_wr(&client_session->queues[0], &mr);
-		if (ret) {
-			printf("%s: rdma_recv_mr failed\n", __func__);
-			return ret;
-		}
-
-		ret = rdma_poll_cq(client_session->queues[0].cq, 1);
-		if (ret) {
-			printf("%s: rdma_poll_cq failed\n", __func__);
-			return ret;
-		}
-	}
-
-	return 1;
-}
-
-static int on_disconnect(struct queue *q) 
-{
-	int ret; 
-
-	printf("%s\n", __func__);
-
-	ret = rdma_disconnect(q->cm_id);
-    if (ret) {
-        printf("%s: rdma_disconnect \n", __func__);
-		return ret;
-    }
-
-    rdma_destroy_qp(q->cm_id);
-    ret = rdma_destroy_id(q->cm_id);
-    if (ret) {
-        printf("%s: rdma_destroy_id failed\n", __func__);
-		return ret;
-    }
-
-    ret = ibv_destroy_cq(q->cq);
-    if (ret) {
-        printf("%s: ibv_destroy_cq failed\n", __func__);
-		return ret;
-    }
-
-	if (cc) {
-		ret = ibv_destroy_comp_channel(cc);
-	    if (ret) {
-		    printf("%s: ibv_destroy_comp_channel failed\n", __func__);
-			return ret;
-	    }
-	}
-
-	if (q->ctrl->dev->pd) {
-		ret = ibv_dealloc_pd(q->ctrl->dev->pd);
-	    if (!ret) {
-		    printf("%s: ibv_dealloc_pd failed\n", __func__);
-			return ret;
-	    }
-	}
-
-	if (ec) {
-		rdma_destroy_event_channel(ec);
-	}
-
+	TEST_NZ(rdma_recv_wr(&client_session->queues[0], &mr));
+	TEST_NZ(rdma_poll_cq(client_session->queues[0].cq, 1));
 	return 1;
 }
 
@@ -162,7 +73,8 @@ static int on_event(struct rdma_cm_event *event)
 			printf("%s: RDMA_CM_EVENT_REJECTD\n", __func__);
 			return 1;
 		case RDMA_CM_EVENT_DISCONNECTED:
-			return on_disconnect(q);
+			printf("%s: disconnect\n", __func__);
+			return 1;
 		default:
 			printf("%s: %s\n", __func__, rdma_event_str(event->event));
 			return 1;
@@ -172,62 +84,30 @@ static int on_event(struct rdma_cm_event *event)
 int start_rdma_client(struct sockaddr_in *s_addr)
 {
 	struct rdma_cm_event *event;
-	int ret;
 
-	if (!client_session) {
-		ret = rdma_alloc_session(&client_session);
-		if (ret) {
-			printf("%s: alloc_control failed\n", __func__);
-			return -EINVAL;
-		}
-	}
+	TEST_NZ(rdma_alloc_session(&client_session));
 
-	ec = rdma_create_event_channel();
-	if (!ec) {
-		printf("%s: rdma_create_event_channel failed\n", __func__);
-		return -EINVAL;
-	}
+	for (unsigned int i = 0; i < NUM_QUEUES; i++) {
+		ec[i] = rdma_create_event_channel();
+		TEST_NZ((ec[i] == NULL));
+		TEST_NZ(rdma_create_id(ec[i], &cm_id[i], NULL, RDMA_PS_TCP));
+		TEST_NZ(rdma_resolve_addr(cm_id[i], NULL, (struct sockaddr *) s_addr, 2000));
 
-	ret = rdma_create_id(ec, &cm_id, NULL, RDMA_PS_TCP);
-	if (ret) {
-		printf("%s: rdma_create_id failed \n", __func__);
-		return -EINVAL;
-	}
+		while (!rdma_get_cm_event(ec[i], &event)) {
+			struct rdma_cm_event event_copy;
 
-	ret = rdma_resolve_addr(cm_id, NULL, (struct sockaddr *) s_addr, CONNECTION_TIMEOUT_MS);
-	if (ret) {
-		printf("%s: rdma_resolve_addr failed\n", __func__);
-		return -EINVAL;
-	}
+			memcpy(&event_copy, event, sizeof(*event));
+			rdma_ack_cm_event(event);
 
-	while (!rdma_get_cm_event(ec, &event)) {
-		struct rdma_cm_event event_copy;
-
-		memcpy(&event_copy, event, sizeof(*event));
-		rdma_ack_cm_event(event);
-
-		if (on_event(&event_copy)) {
+			if (on_event(&event_copy))
 			break;
 		}
 	}
 
-	return ret;
+	return 0;
 }
 
-int disconnect_rdma_client(void)
+struct queue *get_queue(int idx)
 {
-	int i, ret;
-
-	printf("%s\n", __func__);
-
-	for (i = 0; i < NUM_QUEUES; i++) {
-		ret = on_disconnect(&client_session->queues[i]);
-		if (!ret) {
-			printf("%s: on_disconnect failed \n", __func__);
-			return ret;
-		}
-	}
-
-	free(client_session);
-	return ret;
+	return &client_session->queues[idx];
 }
