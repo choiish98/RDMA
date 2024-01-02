@@ -36,10 +36,14 @@
 #define true 1
 #define false 0
 
-#define NUM_QUEUES 1
+#define NUM_QUEUES 2
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128
+
+#define RDMA_INIT 0
+#define RDMA_CONNECT 1
+#define RDMA_DISCONNECT 2
 
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
@@ -76,6 +80,7 @@ struct ctrl {
 int rdma_alloc_session(struct ctrl **session);
 int rdma_create_device(struct queue *q);
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc);
+int rdma_modify_qp(struct queue *q);
 int rdma_create_mr(struct ibv_pd *pd);
 
 int rdma_poll_cq(struct ibv_cq *cq, int total);

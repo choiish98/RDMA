@@ -1,19 +1,34 @@
 #include "rdma_common.h"
 #include "rdma_client.h"
 
-struct sockaddr_in s_addr;
-extern struct ctrl client_session; 
+pthread_t client_init;
+pthread_t worker[NUM_QUEUES];
 
-static void simulator(void)
+struct sockaddr_in s_addr;
+int rdma_status;
+
+static void *process_client_init(void *arg)
 {
-	struct queue *q = get_queue(0);
+	rdma_status = RDMA_INIT;
+	start_rdma_client(&s_addr);
+	while (rdma_status == RDMA_CONNECT);
+}
+
+static void *simulator(void *arg)
+{
+	int cpu = *(int *)arg;
+	struct queue *q = get_queue(cpu);
+
+	printf("%s: start on %d\n", __func__, cpu);
 
 	for (int i = 0; i < 100; i++) {
-		printf("req\n");
+		printf("%s: req %d on %d\n", __func__, i, cpu);
 		rdma_send_wr(q, IBV_WR_SEND, &q->ctrl->servermr, NULL);
 		rdma_poll_cq(q->cq, 1);
-		printf("%d done\n", i);
+		printf("%s: done %d on %d\n", __func__, i, cpu);
 	}
+
+	rdma_status = RDMA_DISCONNECT;
 }
 
 static inline int get_addr(char *sip)
@@ -55,13 +70,18 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	TEST_NZ(start_rdma_client(&s_addr));
+	pthread_create(&client_init, NULL, process_client_init, NULL);
+	while (rdma_status != RDMA_CONNECT);
 	
 	// Client is connected with server throught RDMA from now.
 	// From now on, You can do what you want to do with RDMA.
 	printf("The client is connected successfully\n");
-	sleep(1);
-	simulator();
 
+	for (int i = 0; i < NUM_QUEUES; i++) {
+		pthread_create(&worker[i], NULL, simulator, &i);
+		sleep(1);
+	}
+
+	pthread_join(client_init, NULL);
 	return 0;
 }

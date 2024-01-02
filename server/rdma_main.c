@@ -2,13 +2,10 @@
 #include "rdma_server.h"
 
 pthread_t server_init;
-pthread_t receiver;
-pthread_t worker;
+pthread_t receiver[NUM_QUEUES];
 
 struct sockaddr_in s_addr;
 int rdma_status;
-
-atomic_int wr_check[100];
 
 static void *process_server_init(void *arg)
 {
@@ -18,28 +15,16 @@ static void *process_server_init(void *arg)
 
 static void *process_receiver(void *arg)
 {
-	struct queue *q = get_queue(0);
-	int cnt = 0;
+	int cpu = *(int *)arg;
+	struct queue *q = get_queue(cpu);
 
-	while (true) {
+	printf("%s: start on %d\n", __func__, cpu);
+
+	for (int i = 0; i < 100; i++) {
+		printf("%s: recv %d on %d!\n", __func__, i, cpu);
 		rdma_recv_wr(q, &q->ctrl->servermr);
 		rdma_poll_cq(q->cq, 1);
-
-		atomic_fetch_add(&wr_check[cnt], 1);
-		cnt++;
-	}
-}
-
-static void *process_worker(void *arg)
-{
-	int idx = 0;
-
-	while (true) {
-		if (!atomic_load(&wr_check[idx]))
-			continue;
-
-		printf("worker %d on!\n", idx);
-		idx++;
+		printf("%s: done %d on %d!\n", __func__, i, cpu);
 	}
 }
 
@@ -75,9 +60,12 @@ int main(int argc, char* argv[])
 	pthread_create(&server_init, NULL, process_server_init, NULL);
 	while (rdma_status != RDMA_CONNECT);
 
-	sleep(2);
-	pthread_create(&worker, NULL, process_worker, NULL);
-	pthread_create(&receiver, NULL, process_receiver, NULL);
+	printf("The server is connected successfully\n");
+
+	for (int i = 0; i < NUM_QUEUES; i++) {
+		pthread_create(&receiver[i], NULL, process_receiver, &i);
+		sleep(1);
+	}
 	pthread_join(server_init, NULL);
 	return ret;
 }

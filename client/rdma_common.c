@@ -1,16 +1,9 @@
 #include "rdma_common.h"
 
-#ifdef RDMA_CLIENT
 const unsigned int MAX_SGE = 1024;
 const unsigned int MAX_WR = 1;
 extern char client_memory[PAGE_SIZE];
 extern struct ibv_mr *client_mr;
-#else
-const unsigned int MAX_SGE = 64;
-const unsigned int MAX_WR = 32;
-extern char server_memory[PAGE_SIZE];
-extern struct ibv_mr *server_mr;
-#endif
 
 int rdma_alloc_session(struct ctrl **session)
 {
@@ -104,6 +97,21 @@ int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
     q->qp = q->cm_id->qp;
 
 	return ret;
+}
+
+int rdma_modify_qp(struct queue *q)
+{
+	struct ibv_qp_attr attr;
+
+	memset(&attr, 0, sizeof(struct ibv_qp_attr));
+	attr.pkey_index = 0;
+
+	if (ibv_modify_qp(q->qp, &attr, IBV_QP_PKEY_INDEX)) {
+		printf("%s: ibv_modify_qp failed \n", __func__);
+		return 1;
+	}
+
+	return 0;
 }
 
 int rdma_create_mr(struct ibv_pd *pd)

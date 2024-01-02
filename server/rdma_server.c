@@ -38,23 +38,7 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 
 static int on_connection(struct queue *q)
 {
-	struct mr_attr mr;
-
-	printf("%s\n", __func__);
-	TEST_NZ(rdma_create_mr(server_session->dev->pd));
-
-	mr.addr = (uint64_t) server_mr->addr;
-	mr.length = sizeof(struct mr_attr);
-	mr.stag.lkey = server_mr->lkey;
-	memcpy(server_memory, &mr, sizeof(struct mr_attr));
-
-	TEST_NZ(rdma_send_wr(q, IBV_WR_SEND, &mr, NULL));
-	TEST_NZ(rdma_poll_cq(q->cq, 1));
-
-	q->ctrl->servermr.addr = (uint64_t) server_mr->addr;
-	q->ctrl->servermr.length = sizeof(struct mr_attr);
-	q->ctrl->servermr.stag.lkey = server_mr->lkey;
-
+	printf("%s: queue_ctr = %d\n", __func__, queue_ctr);
 	return 1;
 }
 
@@ -97,6 +81,7 @@ static int on_event(struct rdma_cm_event *event)
 int start_rdma_server(struct sockaddr_in s_addr)
 {
 	struct rdma_cm_event *event;
+	struct mr_attr mr;
 	int i;
 
 	TEST_NZ(rdma_alloc_session(&server_session));
@@ -106,18 +91,32 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
 	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
 
-	while (!rdma_get_cm_event(ec, &event)) {
-		struct rdma_cm_event event_copy;
+	for (i = 0; i < NUM_QUEUES; i++) {
+		while (!rdma_get_cm_event(ec, &event)) {
+			struct rdma_cm_event event_copy;
 
-		memcpy(&event_copy, event, sizeof(*event));
-		rdma_ack_cm_event(event);
+			memcpy(&event_copy, event, sizeof(*event));
+			rdma_ack_cm_event(event);
 
-		if (on_event(&event_copy))
-			break;
+			if (on_event(&event_copy))
+				break;
+		}
 	}
 
-	rdma_status = RDMA_CONNECT;
+	TEST_NZ(rdma_create_mr(server_session->dev->pd));
+	mr.addr = (uint64_t) server_mr->addr;
+	mr.length = sizeof(struct mr_attr);
+	mr.stag.lkey = server_mr->lkey;
+	memcpy(server_memory, &mr, sizeof(struct mr_attr));
 
+	rdma_send_wr(&server_session->queues[0], IBV_WR_SEND, &mr, NULL);
+	rdma_poll_cq(server_session->queues[0].cq, 1);
+
+	server_session->servermr.addr = (uint64_t) server_mr->addr;
+	server_session->servermr.length = sizeof(struct mr_attr);
+	server_session->servermr.stag.lkey = server_mr->lkey;
+
+	rdma_status = RDMA_CONNECT;
 	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
 
