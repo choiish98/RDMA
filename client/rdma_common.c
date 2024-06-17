@@ -1,9 +1,17 @@
 #include "rdma_common.h"
 
+#ifdef RDMA_CLIENT
 const unsigned int MAX_SGE = 1024;
 const unsigned int MAX_WR = 1;
 extern char client_memory[PAGE_SIZE];
 extern struct ibv_mr *client_mr;
+//
+#else
+const unsigned int MAX_SGE = 64;
+const unsigned int MAX_WR = 32;
+extern char server_memory[PAGE_SIZE];
+extern struct ibv_mr *server_mr;
+#endif
 
 int rdma_alloc_session(struct ctrl **session)
 {
@@ -146,34 +154,34 @@ int rdma_create_mr(struct ibv_pd *pd)
 }
 
 int rdma_poll_cq(struct ibv_cq *cq, int total) {
-    struct ibv_wc wc[total];
-    int i, cnt = 0;
+	struct ibv_wc wc[total];
+	int i, cnt = 0;
 
-    while (cnt < total) {
-        cnt += ibv_poll_cq(cq, total, wc);
-    }
+	while (cnt < total) {
+		cnt += ibv_poll_cq(cq, total, wc);
+	}
 
-    if (cnt != total) {
-        printf("%s: ibv_poll_cq failed\n", __func__);
-        return -EINVAL;
-    }
+	if (cnt != total) {
+		printf("%s: ibv_poll_cq failed\n", __func__);
+		return -EINVAL;
+	}
 
-    for (i = 0 ; i < total; i++) {
-        if (wc[i].status != IBV_WC_SUCCESS) {
-            printf("%s: %s\n", __func__, ibv_wc_status_str(wc[i].status));
-            return -EINVAL;
-        }
-    }
+	for (i = 0 ; i < total; i++) {
+		if (wc[i].status != IBV_WC_SUCCESS) {
+			printf("%s: %s\n", __func__, ibv_wc_status_str(wc[i].status));
+			return -EINVAL;
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 {
 	struct ibv_recv_wr *bad_wr;
-    struct ibv_recv_wr wr;
-    struct ibv_sge sge;
-    int ret;
+    	struct ibv_recv_wr wr;
+    	struct ibv_sge sge;
+    	int ret;
 
 	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
@@ -184,13 +192,13 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 
-    ret = ibv_post_recv(q->qp, &wr, &bad_wr);
-    if (ret) {
-        printf("%s: ib_post_recv failed\n", __func__);
-        return ret;
-    }
+    	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
+    	if (ret) {
+        	printf("%s: ib_post_recv failed\n", __func__);
+        	return ret;
+    	}
 
-    return ret;
+	return ret;
 }
 
 int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode, 
