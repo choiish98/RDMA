@@ -121,35 +121,35 @@ int rdma_create_mr(struct ibv_pd *pd)
 }
 
 int rdma_poll_cq(struct ibv_cq *cq, int total) {
-    struct ibv_wc wc[total];
-    int i, ret;
+	struct ibv_wc wc[total];
+	int i, ret;
 	int cnt = 0;
 
-    while (cnt < total) {
-        ret = ibv_poll_cq(cq, total, wc);
+	while (cnt < total) {
+		ret = ibv_poll_cq(cq, total, wc);
 		cnt += ret;
-    }
+	}
 
-    if (cnt != total) {
-        printf("%s: ibv_poll_cq failed\n", __func__);
-        return -EINVAL;
-    }
+	if (cnt != total) {
+		printf("%s: ibv_poll_cq failed\n", __func__);
+		return -EINVAL;
+	}
 
-    for (i = 0 ; i < total; i++) {
-        if (wc[i].status != IBV_WC_SUCCESS) {
-            printf("%s: %s\n", __func__, ibv_wc_status_str(wc[i].status));
-            return -EINVAL;
-        }
-    }
+	for (i = 0 ; i < total; i++) {
+		if (wc[i].status != IBV_WC_SUCCESS) {
+			printf("%s: %s\n", __func__, ibv_wc_status_str(wc[i].status));
+			return -EINVAL;
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 {
 	struct ibv_recv_wr *bad_wr = NULL;
-    struct ibv_recv_wr wr = {};
-    struct ibv_sge sge = {};
+	struct ibv_recv_wr wr = {};
+	struct ibv_sge sge = {};
 
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
@@ -158,8 +158,8 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 
-    TEST_NZ(ibv_post_recv(q->qp, &wr, &bad_wr));
-    return 0;
+	TEST_NZ(ibv_post_recv(q->qp, &wr, &bad_wr));
+	return 0;
 }
 
 int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode, 
