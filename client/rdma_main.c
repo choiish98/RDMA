@@ -33,7 +33,7 @@ static void simulator(void)
 		printf("%d done\n", i);
 	}
 
-	rdma_status = RDMA_DISCONNECT;
+//	rdma_status = RDMA_DISCONNECT;
 }
 
 static inline int get_addr(char *sip)
