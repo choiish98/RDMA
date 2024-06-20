@@ -121,17 +121,17 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
 	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
 
-	//@delee
-	// Initialize queues
-	for (i = 0; i < NUM_QUEUES; i++) {
-		struct queue *q = &server_session->queues[i];
-		q->cq = ibv_create_cq(server_session->dev->verbs, 
-			CQ_CAPACITY, 
-			NULL, 
-			cc, 
-			0);
-		TEST_NZ((q->cq == NULL));
-	}
+//	//@delee
+//	// Initialize queues
+//	for (i = 0; i < NUM_QUEUES; i++) {
+//		struct queue *q = &server_session->queues[i];
+//		q->cq = ibv_create_cq(server_session->dev->verbs, 
+//			CQ_CAPACITY, 
+//			NULL, 
+//			cc, 
+//			0);
+//		TEST_NZ((q->cq == NULL));
+//	}
 
 	//Process connection requests and other events
 //	for (i = 0; i < NUM_QUEUES; i++) {
@@ -146,20 +146,20 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	}
 //	}
 
-	//Memory region creation and setup
-	TEST_NZ(rdma_create_mr(server_session->dev->pd));
-	mr.addr = (uint64_t) server_mr->addr;
-	mr.length = sizeof(struct mr_attr);
-	mr.stag.lkey = server_mr->lkey;
-	memcpy(server_memory, &mr, sizeof(struct mr_attr));
-
-	// Example send and poll on the first queue
-	rdma_send_wr(&server_session->queues[0], IBV_WR_SEND, &mr, NULL);
-	rdma_poll_cq(server_session->queues[0].cq, 1);
-
-	server_session->servermr.addr = (uint64_t) server_mr->addr;
-	server_session->servermr.length = sizeof(struct mr_attr);
-	server_session->servermr.stag.lkey = server_mr->lkey;
+//	//Memory region creation and setup
+//	TEST_NZ(rdma_create_mr(server_session->dev->pd));
+//	mr.addr = (uint64_t) server_mr->addr;
+//	mr.length = sizeof(struct mr_attr);
+//	mr.stag.lkey = server_mr->lkey;
+//	memcpy(server_memory, &mr, sizeof(struct mr_attr));
+//
+//	// Example send and poll on the first queue
+//	rdma_send_wr(&server_session->queues[0], IBV_WR_SEND, &mr, NULL);
+//	rdma_poll_cq(server_session->queues[0].cq, 1);
+//
+//	server_session->servermr.addr = (uint64_t) server_mr->addr;
+//	server_session->servermr.length = sizeof(struct mr_attr);
+//	server_session->servermr.stag.lkey = server_mr->lkey;
 
 	rdma_status = RDMA_CONNECT;
 
