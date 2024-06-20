@@ -86,16 +86,16 @@ int main(int argc, char* argv[])
 	pthread_create(&server_init, NULL, process_server_init, NULL);
 	while (rdma_status != RDMA_CONNECT);
 
-//	printf("The server is connected successfully\n");
+	printf("The server is connected successfully\n");
 
-//	for (int i = 0; i < NUM_QUEUES; i++) {
-//		pthread_create(&receiver[i], NULL, process_receiver, &i);
-//		sleep(1);
-//	}
-//
-        sleep(2);
-        pthread_create(&worker, NULL, process_worker, NULL);
-        pthread_create(&receiver, NULL, process_receiver, NULL);
+	sleep(2);
+	pthread_create(&worker, NULL, process_worker, NULL);
+//	pthread_create(&receiver, NULL, process_receiver, NULL);
+	for (int i = 0; i < NUM_QUEUES; i++) {
+		pthread_create(&receiver[i], NULL, process_receiver, &i);
+		sleep(1);
+	}
+
 	pthread_join(server_init, NULL);
 	return ret;
 }

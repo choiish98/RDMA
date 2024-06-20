@@ -126,7 +126,11 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	// Initialize queues
 	for (i = 0; i < NUM_QUEUES; i++) {
 		struct queue *q = &server_session->queues[i];
-		q->cq = ibv_create_cq(server_session->dev->verbs, CQ_SIZE, NULL, cc, 0);
+		q->cq = ibv_create_cq(server_session->dev->verbs, 
+			CQ_CAPACITY, 
+			NULL, 
+			cc, 
+			0);
 		TEST_NZ((q->cq == NULL));
 	}
 
