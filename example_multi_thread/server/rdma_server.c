@@ -30,7 +30,6 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 	queue_ctr = (queue_ctr + 1) % NUM_QUEUES;	// NUM_QUEUES is a number of avaiable queue
 	pthread_mutex_unlock(&queue_lock);
 
-
 	id->context = q;
 	q->cm_id = id;
 
@@ -54,7 +53,7 @@ static int on_connection(struct queue *q)
 
 	struct mr_attr mr;
 
-        printf("%s\n", __func__);
+//        printf("%s\n", __func__);
         TEST_NZ(rdma_create_mr(server_session->dev->pd));
 
         mr.addr = (uint64_t) server_mr->addr;
@@ -63,7 +62,7 @@ static int on_connection(struct queue *q)
         memcpy(server_memory, &mr, sizeof(struct mr_attr));
 
         TEST_NZ(rdma_send_wr(q, IBV_WR_SEND, &mr, NULL));
-        TEST_NZ(rdma_poll_cq(q->cq, 1));
+	TEST_NZ(rdma_poll_cq(q->cq, 1));
 
         q->ctrl->servermr.addr = (uint64_t) server_mr->addr;
         q->ctrl->servermr.length = sizeof(struct mr_attr);

@@ -2,6 +2,7 @@
 #include "rdma_server.h"
 
 pthread_t server_init;
+pthread_t receiver_manager;
 pthread_t receiver[NUM_QUEUES];
 pthread_t worker;
 
@@ -16,23 +17,59 @@ static void *process_server_init(void *arg)
 	start_rdma_server(s_addr);
 }
 
-static void *process_receiver(void *arg)
+//static void *process_receiver(void *arg)
+//{
+//	int cpu = *(int *)arg;
+//	struct queue *q = get_queue(cpu);
+//
+//	int cnt = 0;
+//	printf("%s: start on %d\n", __func__, cpu);
+//
+//	while(true){
+//	   	printf("%s: recv %d!\n", __func__, cpu);
+//		rdma_recv_wr(q, &q->ctrl->servermr);
+//		rdma_poll_cq(q->cq, 1);
+//		printf("%s: done %d!\n", __func__, cpu);
+//
+//		atomic_fetch_add(&wr_check[cnt], 1);
+//		cnt++;
+//	}
+//}
+//
+//static void *process_receiver(void *arg)
+//{
+//	rdma_recv_wr(q[], &q->ctrl->servermr);
+//}
+
+static void *process_receiver_manager(void *arg)
 {
-	int cpu = *(int *)arg;
-	struct queue *q = get_queue(cpu);
+	struct queue *q[NUM_QUEUES];
+
+	//@delee
+	//make receivers
+        for (int i = 0; i < NUM_QUEUES; i++) {
+		q[i] = get_queue(i);
+		printf("It is OK!!!");
+//		pthread_create(&receiver[i], NULL, process_receiver, &i);
+		pthread_create(&receiver[i], NULL, rdma_recv_wr(q[i], &q[i]->ctrl->servermr), &i);
+                printf("%s: start on %d\n", __func__, i);
+//		sleep(1);
+        }
 
 	int cnt = 0;
-	printf("%s: start on %d\n", __func__, cpu);
+	//@delee
+	//check queue
+        while(true){
+		for (int i = 0; i < NUM_QUEUES; i++) {
+//	                printf("%s: recv %d!\n", __func__, cpu);
+//	                rdma_recv_wr(q, &q->ctrl->servermr);
+	                rdma_poll_cq(q[i]->cq, 1);
+	                printf("%s: done %d!\n", __func__, i);
 
-	while(true){
-	  	printf("%s: recv %d!\n", __func__, cpu);
-		rdma_recv_wr(q, &q->ctrl->servermr);
-		rdma_poll_cq(q->cq, 1);
-		printf("%s: done %d!\n", __func__, cpu);
-
-		atomic_fetch_add(&wr_check[cnt], 1);
-		cnt++;
-	}
+	                atomic_fetch_add(&wr_check[cnt], 1);
+	                cnt++;
+		}
+        }
 }
 
 static void *process_worker(void *arg)
@@ -85,14 +122,15 @@ int main(int argc, char* argv[])
 
 	printf("The server is connected successfully\n");
 
+	sleep(2);
+
 	pthread_create(&worker, NULL, process_worker, NULL);
 //      pthread_create(&receiver, NULL, process_receiver, NULL);
-	for (int i = 0; i < NUM_QUEUES; i++) {
-		pthread_create(&receiver[i], NULL, process_receiver, &i);
-		sleep(1);
-	}
-
-	sleep(2);
+//	for (int i = 0; i < NUM_QUEUES; i++) {
+//		pthread_create(&receiver[i], NULL, process_receiver, &i);
+//		sleep(1);
+//	}
+	pthread_create(&receiver_manager, NULL, process_receiver_manager, NULL);
 
 	pthread_join(server_init, NULL);
 	return ret;
