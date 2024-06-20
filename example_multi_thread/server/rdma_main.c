@@ -9,6 +9,8 @@ pthread_t worker;
 struct sockaddr_in s_addr;
 int rdma_status;
 
+struct queue *q[NUM_QUEUES];
+
 atomic_int wr_check[100];
 
 static void *process_server_init(void *arg)
@@ -36,33 +38,35 @@ static void *process_server_init(void *arg)
 //	}
 //}
 //
-//static void *process_receiver(void *arg)
-//{
-//	rdma_recv_wr(q[], &q->ctrl->servermr);
-//}
+static void *process_receiver(void *arg)
+{
+	int cpu = *(int *)arg;
+	rdma_recv_wr(q[cpu], &q[cpu]->ctrl->servermr);
+}
 
 static void *process_receiver_manager(void *arg)
 {
-	struct queue *q[NUM_QUEUES];
+//	struct queue *q[NUM_QUEUES];
 
 	//@delee
 	//make receivers
         for (int i = 0; i < NUM_QUEUES; i++) {
 		q[i] = get_queue(i);
-		printf("It is OK!!!");
-//		pthread_create(&receiver[i], NULL, process_receiver, &i);
-		pthread_create(&receiver[i], NULL, rdma_recv_wr(q[i], &q[i]->ctrl->servermr), &i);
+		pthread_create(&receiver[i], NULL, process_receiver, &i);
+//		pthread_create(&receiver[i], NULL, (rdma_recv_wr(q[i], &q[i]->ctrl->servermr)), &i);
                 printf("%s: start on %d\n", __func__, i);
 //		sleep(1);
         }
+	printf("It is OK!!!");
 
-	int cnt = 0;
+	int cnt =0;
 	//@delee
 	//check queue
         while(true){
 		for (int i = 0; i < NUM_QUEUES; i++) {
 //	                printf("%s: recv %d!\n", __func__, cpu);
 //	                rdma_recv_wr(q, &q->ctrl->servermr);
+			printf("It is OK!!!");
 	                rdma_poll_cq(q[i]->cq, 1);
 	                printf("%s: done %d!\n", __func__, i);
 
