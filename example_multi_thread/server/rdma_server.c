@@ -6,6 +6,9 @@ struct rdma_event_channel *ec;
 struct rdma_cm_id *listener;
 int queue_ctr = 0;
 
+//@delee
+pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
+
 char server_memory[PAGE_SIZE];
 struct ibv_mr *server_mr;
 
@@ -15,9 +18,18 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 {
 	struct rdma_conn_param cm_params = {};
 	struct ibv_device_attr attrs = {};
-	struct queue *q = &server_session->queues[queue_ctr++];
+//	struct queue *q = &server_session->queues[queue_ctr++];
+	struct queue *q;
 
 	printf("%s\n", __func__);
+
+	//@delee
+	//Lock for selecting of Queue
+	pthread_mutex_lock(&queue_lock);
+	q = &server_session->queues[queue_ctr];
+	queue_ctr = (queue_ctr + 1) % NUM_QUEUES;	// NUM_QUEUES is a number of avaiable queue
+	pthread_mutex_unlock(&queue_lock);
+
 
 	id->context = q;
 	q->cm_id = id;
@@ -99,7 +111,7 @@ static int on_event(struct rdma_cm_event *event)
 int start_rdma_server(struct sockaddr_in s_addr)
 {
 	struct rdma_cm_event *event;
-//	struct mr_attr mr;
+	struct mr_attr mr;
 	int i;
 
 	TEST_NZ(rdma_alloc_session(&server_session));
@@ -109,6 +121,19 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
 	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
 
+	//@delee
+	// Initialize queues
+	for (i = 0; i < NUM_QUEUES; i++) {
+		struct queue *q = &server_session->queues[i];
+		q->cq = ibv_create_cq(server_session->dev->verbs, 
+			CQ_CAPACITY, 
+			NULL, 
+			cc, 
+			0);
+		TEST_NZ((q->cq == NULL));
+	}
+
+	//Process connection requests and other events
 //	for (i = 0; i < NUM_QUEUES; i++) {
 	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
@@ -121,12 +146,14 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	}
 //	}
 
+	//Memory region creation and setup
 	TEST_NZ(rdma_create_mr(server_session->dev->pd));
 	mr.addr = (uint64_t) server_mr->addr;
 	mr.length = sizeof(struct mr_attr);
 	mr.stag.lkey = server_mr->lkey;
 	memcpy(server_memory, &mr, sizeof(struct mr_attr));
 
+	// Example send and poll on the first queue
 	rdma_send_wr(&server_session->queues[0], IBV_WR_SEND, &mr, NULL);
 	rdma_poll_cq(server_session->queues[0].cq, 1);
 

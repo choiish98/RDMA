@@ -59,7 +59,6 @@ static void usage(void)
 int main(int argc, char* argv[])
 {
 	int ret, option;
-
 	while ((option = getopt(argc, argv, "p:")) != -1) {
 		switch (option) {
 			case 'p':
@@ -79,18 +78,21 @@ int main(int argc, char* argv[])
 	s_addr.sin_family = AF_INET;
 
 	pthread_create(&server_init, NULL, process_server_init, NULL);
+	//@delee
+	//TODO!!!
+	//It is has error!!!
 	while (rdma_status != RDMA_CONNECT);
 
 	printf("The server is connected successfully\n");
 
+	pthread_create(&worker, NULL, process_worker, NULL);
+//      pthread_create(&receiver, NULL, process_receiver, NULL);
 	for (int i = 0; i < NUM_QUEUES; i++) {
 		pthread_create(&receiver[i], NULL, process_receiver, &i);
 		sleep(1);
 	}
 
 	sleep(2);
-	pthread_create(&worker, NULL, process_worker, NULL);
-//	pthread_create(&receiver, NULL, process_receiver, NULL);
 
 	pthread_join(server_init, NULL);
 	return ret;
