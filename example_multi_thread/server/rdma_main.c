@@ -57,21 +57,26 @@ static void *process_receiver_manager(void *arg)
                 printf("%s: start on %d\n", __func__, i);
 //		sleep(1);
         }
-	printf("It is OK!!!");
+//	printf("It is OK!!!");
 
-	int cnt =0;
+	int cnt = 0;
 	//@delee
 	//check queue
+	int current_q = 0;
         while(true){
 		for (int i = 0; i < NUM_QUEUES; i++) {
 //	                printf("%s: recv %d!\n", __func__, cpu);
 //	                rdma_recv_wr(q, &q->ctrl->servermr);
-			printf("It is OK!!!");
-	                rdma_poll_cq(q[i]->cq, 1);
-	                printf("%s: done %d!\n", __func__, i);
 
-	                atomic_fetch_add(&wr_check[cnt], 1);
-	                cnt++;
+		printf("Message arriving in queue %d\n", current_q);
+		printf("It is OK!!!");
+		rdma_poll_cq(q[current_q]->cq, 1);
+		current_q = (current_q + 1) % NUM_QUEUES;
+		printf("%s: done %d!\n", __func__, current_q);
+//		rdma_poll_cq(q[i]->cq, 1);
+//		printf("%s: done %d!\n", __func__, i);
+		atomic_fetch_add(&wr_check[cnt], 1);
+		cnt++;
 		}
         }
 }
