@@ -9,5 +9,5 @@ ex) ./rdma_main -p 50000
 ```
 make
 ./rdma_main -i <server's ip> -p <server's port>
-ex) ./rdma_main -i 10.1.2.2 -p 50000
+ex) ./rdma_main -i 10.0.0.11 -p 50000
 ```

@@ -46,9 +46,9 @@ static int on_connection(struct queue *q)
 {
 	struct mr_attr mr;
 
-//	printf("%s: queue_ctr = %d\n", __func__, queue_ctr);
-//	if (queue_ctr != NUM_QUEUES)
-//		return 1;
+	printf("%s: queue_ctr = %d\n", __func__, queue_ctr);
+	if (queue_ctr != NUM_QUEUES)
+		return 1;
 
 	printf("%s\n", __func__);
 
@@ -58,7 +58,7 @@ static int on_connection(struct queue *q)
 	mr.length = sizeof(struct mr_attr);
 	mr.stag.lkey = client_mr->lkey;
 	memcpy(client_memory, &mr, sizeof(struct mr_attr));
-	
+
 	TEST_NZ(rdma_recv_wr(&client_session->queues[queue_ctr-1], &mr));
 	TEST_NZ(rdma_poll_cq(client_session->queues[queue_ctr-1].cq, 1));
 	return 1;
