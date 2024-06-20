@@ -3,13 +3,11 @@
 
 pthread_t server_init;
 pthread_t receiver[NUM_QUEUES];
-//pthread_t receiver;
 pthread_t worker;
 
 struct sockaddr_in s_addr;
 int rdma_status;
 
-//
 atomic_int wr_check[100];
 
 static void *process_server_init(void *arg)
@@ -22,24 +20,21 @@ static void *process_receiver(void *arg)
 {
 	int cpu = *(int *)arg;
 	struct queue *q = get_queue(cpu);
-//	struct queue *q = get_queue(0);
-//
+
 	int cnt = 0;
 	printf("%s: start on %d\n", __func__, cpu);
 
-//	for (int i = 0; i < 100; i++) {
 	while(true){
-//	  	printf("%s: recv %d on %d!\n", __func__, i, cpu);
+	  	printf("%s: recv %d!\n", __func__, cpu);
 		rdma_recv_wr(q, &q->ctrl->servermr);
 		rdma_poll_cq(q->cq, 1);
-//		printf("%s: done %d on %d!\n", __func__, i, cpu);
+		printf("%s: done %d!\n", __func__, cpu);
 
 		atomic_fetch_add(&wr_check[cnt], 1);
 		cnt++;
 	}
 }
 
-//
 static void *process_worker(void *arg)
 {
         int idx = 0;
@@ -88,13 +83,14 @@ int main(int argc, char* argv[])
 
 	printf("The server is connected successfully\n");
 
-	sleep(2);
-	pthread_create(&worker, NULL, process_worker, NULL);
-//	pthread_create(&receiver, NULL, process_receiver, NULL);
 	for (int i = 0; i < NUM_QUEUES; i++) {
 		pthread_create(&receiver[i], NULL, process_receiver, &i);
 		sleep(1);
 	}
+
+	sleep(2);
+	pthread_create(&worker, NULL, process_worker, NULL);
+//	pthread_create(&receiver, NULL, process_receiver, NULL);
 
 	pthread_join(server_init, NULL);
 	return ret;
