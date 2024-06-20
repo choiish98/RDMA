@@ -1,104 +1,155 @@
-#include "rdma_common.h"
 #include "rdma_server.h"
 
-pthread_t server_init;
-pthread_t receiver[NUM_QUEUES];
-//pthread_t receiver;
-pthread_t worker;
+struct ctrl *server_session;
+struct ibv_comp_channel *cc;
+struct rdma_event_channel *ec;
+struct rdma_cm_id *listener;
+int queue_ctr = 0;
 
-struct sockaddr_in s_addr;
-int rdma_status;
+char server_memory[PAGE_SIZE];
+struct ibv_mr *server_mr;
 
-//
-atomic_int wr_check[100];
+extern int rdma_status;
 
-static void *process_server_init(void *arg)
+static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *param)
 {
-	rdma_status = RDMA_INIT;
-	start_rdma_server(s_addr);
+	struct rdma_conn_param cm_params = {};
+	struct ibv_device_attr attrs = {};
+	struct queue *q = &server_session->queues[queue_ctr++];
+
+	printf("%s\n", __func__);
+
+	id->context = q;
+	q->cm_id = id;
+
+	if (!q->ctrl->dev) 
+		TEST_NZ(rdma_create_device(q));
+	TEST_NZ(rdma_create_queue(q, cc));
+	TEST_NZ(ibv_query_device(q->ctrl->dev->verbs, &attrs));
+
+	cm_params.initiator_depth = param->initiator_depth;
+	cm_params.responder_resources = param->responder_resources;
+	cm_params.rnr_retry_count = param->rnr_retry_count;
+	cm_params.flow_control = param->flow_control;
+
+	TEST_NZ(rdma_accept(q->cm_id, &cm_params));
+	return 0;
 }
 
-static void *process_receiver(void *arg)
+static int on_connection(struct queue *q)
 {
-	int cpu = *(int *)arg;
-	struct queue *q = get_queue(cpu);
-//	struct queue *q = get_queue(0);
-//
-	int cnt = 0;
-	printf("%s: start on %d\n", __func__, cpu);
+	printf("%s: queue_ctr = %d\n", __func__, queue_ctr);
 
-//	for (int i = 0; i < 100; i++) {
-	while(true){
-	  	printf("%s: recv %d!\n", __func__, cpu);
-		//@delee
-		//TODO!!!
-		//It has error!!!
-		rdma_recv_wr(q, &q->ctrl->servermr);
-		rdma_poll_cq(q->cq, 1);
-		printf("%s: done %d!\n", __func__, cpu);
+	struct mr_attr mr;
 
-		atomic_fetch_add(&wr_check[cnt], 1);
-		cnt++;
+        printf("%s\n", __func__);
+        TEST_NZ(rdma_create_mr(server_session->dev->pd));
+
+        mr.addr = (uint64_t) server_mr->addr;
+        mr.length = sizeof(struct mr_attr);
+        mr.stag.lkey = server_mr->lkey;
+        memcpy(server_memory, &mr, sizeof(struct mr_attr));
+
+        TEST_NZ(rdma_send_wr(q, IBV_WR_SEND, &mr, NULL));
+        TEST_NZ(rdma_poll_cq(q->cq, 1));
+
+        q->ctrl->servermr.addr = (uint64_t) server_mr->addr;
+        q->ctrl->servermr.length = sizeof(struct mr_attr);
+        q->ctrl->servermr.stag.lkey = server_mr->lkey;
+
+	return 1;
+}
+
+static int on_disconnect(struct queue *q)
+{
+	printf("%s\n", __func__);
+
+	rdma_disconnect(q->cm_id);
+	rdma_destroy_qp(q->cm_id);
+	ibv_destroy_cq(q->cq);
+	rdma_destroy_id(q->cm_id);
+	rdma_destroy_event_channel(ec);
+	ibv_dealloc_pd(server_session->dev->pd);
+	free(server_session->dev);
+	server_session->dev = NULL;
+	return 1;
+}
+
+static int on_event(struct rdma_cm_event *event)
+{
+	struct queue *q = (struct queue *) event->id->context;
+	printf("%s\n", __func__);
+
+	switch (event->event) {
+		case RDMA_CM_EVENT_CONNECT_REQUEST:
+			return on_connect_request(event->id, &event->param.conn);
+		case RDMA_CM_EVENT_ESTABLISHED:
+			return on_connection(q);
+		case RDMA_CM_EVENT_DISCONNECTED:
+			return on_disconnect(q);
+		case RDMA_CM_EVENT_REJECTED:
+			printf("connect rejected\n");
+			return 1;
+		default:
+			printf("unknown event: %s\n", rdma_event_str(event->event));
+			return 1;
 	}
 }
 
-//
-static void *process_worker(void *arg)
+int start_rdma_server(struct sockaddr_in s_addr)
 {
-        int idx = 0;
+	struct rdma_cm_event *event;
+//	struct mr_attr mr;
+	int i;
 
-        while (true) {
-                if (!atomic_load(&wr_check[idx]))
-                        continue;
+	TEST_NZ(rdma_alloc_session(&server_session));
+	ec = rdma_create_event_channel();
+	TEST_NZ((ec == NULL));
+	TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
+	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
+	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
 
-                printf("worker %d on!\n", idx);
-                idx++;
-        }
+//	for (i = 0; i < NUM_QUEUES; i++) {
+	while (!rdma_get_cm_event(ec, &event)) {
+		struct rdma_cm_event event_copy;
+
+		memcpy(&event_copy, event, sizeof(*event));
+		rdma_ack_cm_event(event);
+
+		if (on_event(&event_copy))
+			break;
+	}
+//	}
+
+	TEST_NZ(rdma_create_mr(server_session->dev->pd));
+	mr.addr = (uint64_t) server_mr->addr;
+	mr.length = sizeof(struct mr_attr);
+	mr.stag.lkey = server_mr->lkey;
+	memcpy(server_memory, &mr, sizeof(struct mr_attr));
+
+	rdma_send_wr(&server_session->queues[0], IBV_WR_SEND, &mr, NULL);
+	rdma_poll_cq(server_session->queues[0].cq, 1);
+
+	server_session->servermr.addr = (uint64_t) server_mr->addr;
+	server_session->servermr.length = sizeof(struct mr_attr);
+	server_session->servermr.stag.lkey = server_mr->lkey;
+
+	rdma_status = RDMA_CONNECT;
+
+	while (!rdma_get_cm_event(ec, &event)) {
+		struct rdma_cm_event event_copy;
+
+		memcpy(&event_copy, event, sizeof(*event));
+		rdma_ack_cm_event(event);
+
+		if (on_event(&event_copy))
+			break;
+	}
+
+	return 0;
 }
 
-
-static void usage(void)
+struct queue *get_queue(int idx)
 {
-	printf("[Usage] : ");
-	printf("./rdma_main [-port <server port>]\n");
-	exit(1);
-}
-
-int main(int argc, char* argv[])
-{
-	int ret, option;
-
-	while ((option = getopt(argc, argv, "p:")) != -1) {
-		switch (option) {
-			case 'p':
-				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
-				printf("%s: listening on port %s.\n", __func__, optarg);
-				break;
-			default:
-				usage();
-				break;
-		}
-	}
-
-	if (!s_addr.sin_port) {
-		usage();
-		return ret;
-	}
-	s_addr.sin_family = AF_INET;
-
-	pthread_create(&server_init, NULL, process_server_init, NULL);
-	while (rdma_status != RDMA_CONNECT);
-
-	printf("The server is connected successfully\n");
-
-	sleep(2);
-	pthread_create(&worker, NULL, process_worker, NULL);
-//	pthread_create(&receiver, NULL, process_receiver, NULL);
-	for (int i = 0; i < NUM_QUEUES; i++) {
-		pthread_create(&receiver[i], NULL, process_receiver, &i);
-		sleep(1);
-	}
-
-	pthread_join(server_init, NULL);
-	return ret;
+	return &server_session->queues[idx];
 }
