@@ -1,30 +1,34 @@
 #include "rdma_common.h"
 #include "rdma_client.h"
 
-//pthread_t client_init;
-//pthread_t worker[NUM_QUEUES];
+pthread_t client_init;
+pthread_t worker[NUM_QUEUES];
 
 struct sockaddr_in s_addr;
-//int rdma_status;
+int rdma_status;
 extern struct ctrl client_session;
 
-//static void *process_client_init(void *arg)
-//{
-//	rdma_status = RDMA_INIT;
-//	start_rdma_client(&s_addr);
-//	while (rdma_status == RDMA_CONNECT);
-//}
-
-//static void *simulator(void *arg)
-static void simulator(void)
+static void *process_client_init(void *arg)
 {
-//	int cpu = *(int *)arg;
-//	struct queue *q = get_queue(cpu);
-	struct queue *q = get_queue(0);
+	rdma_status = RDMA_INIT;
+	start_rdma_client(&s_addr);
+	while (rdma_status == RDMA_CONNECT);
+}
 
-//	printf("%s: start on %d\n", __func__, cpu);
+static void *simulator(void *arg)
+//static void simulator(void)
+{
+	int cpu = *(int *)arg;
+	struct queue *q = get_queue(cpu);
+
+	printf("%s: start on %d\n", __func__, cpu);
+
+	//@delee
+	//check queue
+	int current_q = 0;
 
 	for (int i = 0; i < 100; i++) {
+
 //		printf("%s: req %d on %d\n", __func__, i, cpu);
 		printf("req\n");
 		rdma_send_wr(q, IBV_WR_SEND, &q->ctrl->servermr, NULL);
