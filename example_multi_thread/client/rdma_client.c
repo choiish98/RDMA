@@ -9,7 +9,7 @@ int queue_ctr = 0;
 char client_memory[PAGE_SIZE]; 
 struct ibv_mr *client_mr;
 
-//extern int rdma_status;
+extern int rdma_status;
 
 static int on_addr_resolved(struct rdma_cm_id *id)
 {
@@ -21,7 +21,8 @@ static int on_addr_resolved(struct rdma_cm_id *id)
 
 	if (!q->ctrl->dev) 
 		TEST_NZ(rdma_create_device(q));
-	TEST_NZ(rdma_create_queue(q, cc[queue_ctr++]));
+	TEST_NZ(rdma_create_queue(q, cc[queue_ctr]));
+//	TEST_NZ(rdma_create_queue(q, cc[queue_ctr++]));
 //	TEST_NZ(rdma_modify_qp(q));
 	TEST_NZ(rdma_resolve_route(q->cm_id, CONNECTION_TIMEOUT_MS));
 	return 0;
@@ -59,8 +60,8 @@ static int on_connection(struct queue *q)
 	mr.stag.lkey = client_mr->lkey;
 	memcpy(client_memory, &mr, sizeof(struct mr_attr));
 
-	TEST_NZ(rdma_recv_wr(&client_session->queues[queue_ctr-1], &mr));
-	TEST_NZ(rdma_poll_cq(client_session->queues[queue_ctr-1].cq, 1));
+	TEST_NZ(rdma_recv_wr(&client_session->queues[queue_ctr], &mr));
+	TEST_NZ(rdma_poll_cq(client_session->queues[queue_ctr].cq, 1));
 	return 1;
 }
 
@@ -111,7 +112,7 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 		}
 	}
 
-//	rdma_status = RDMA_CONNECT;
+	rdma_status = RDMA_CONNECT;
 	return 0;
 }
 

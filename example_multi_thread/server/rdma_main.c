@@ -19,67 +19,64 @@ static void *process_server_init(void *arg)
 	start_rdma_server(s_addr);
 }
 
-//static void *process_receiver(void *arg)
-//{
-//	int cpu = *(int *)arg;
-//	struct queue *q = get_queue(cpu);
-//
-//	int cnt = 0;
-//	printf("%s: start on %d\n", __func__, cpu);
-//
-//	while(true){
-//	   	printf("%s: recv %d!\n", __func__, cpu);
-//		rdma_recv_wr(q, &q->ctrl->servermr);
-//		rdma_poll_cq(q->cq, 1);
-//		printf("%s: done %d!\n", __func__, cpu);
-//
-//		atomic_fetch_add(&wr_check[cnt], 1);
-//		cnt++;
-//	}
-//}
-//
 static void *process_receiver(void *arg)
 {
 	int cpu = *(int *)arg;
-	rdma_recv_wr(q[cpu], &q[cpu]->ctrl->servermr);
-}
-
-static void *process_receiver_manager(void *arg)
-{
-//	struct queue *q[NUM_QUEUES];
-
-	//@delee
-	//make receivers
-        for (int i = 0; i < NUM_QUEUES; i++) {
-		q[i] = get_queue(i);
-		pthread_create(&receiver[i], NULL, process_receiver, &i);
-//		pthread_create(&receiver[i], NULL, (rdma_recv_wr(q[i], &q[i]->ctrl->servermr)), &i);
-                printf("%s: start on %d\n", __func__, i);
-//		sleep(1);
-        }
-//	printf("It is OK!!!");
+	struct queue *q = get_queue(cpu);
 
 	int cnt = 0;
-	//@delee
-	//check queue
-	int current_q = 0;
-        while(true){
-		for (int i = 0; i < NUM_QUEUES; i++) {
-//	                printf("%s: recv %d!\n", __func__, cpu);
-//	                rdma_recv_wr(q, &q->ctrl->servermr);
+	printf("%s: start on %d\n", __func__, cpu);
 
-		printf("Message arriving in queue %d\n", current_q);
-		printf("It is OK!!!");
-		rdma_poll_cq(q[current_q]->cq, 1);
-		current_q = (current_q + 1) % NUM_QUEUES;
-		printf("%s: done %d!\n", __func__, current_q);
-//		rdma_poll_cq(q[i]->cq, 1);
-//		printf("%s: done %d!\n", __func__, i);
+	while(true){
+	   	printf("%s: recv %d!\n", __func__, cpu);
+		rdma_recv_wr(q, &q->ctrl->servermr);
+		rdma_poll_cq(q->cq, 1);
+		printf("%s: done %d!\n", __func__, cpu);
+
 		atomic_fetch_add(&wr_check[cnt], 1);
 		cnt++;
-		}
-        }
+	}
 }
+
+//
+//static void *process_receiver(void *arg)
+//{
+//	int cpu = *(int *)arg;
+//	rdma_recv_wr(q[cpu], &q[cpu]->ctrl->servermr);
+//}
+//
+//static void *process_receiver_manager(void *arg)
+//{
+////	struct queue *q[NUM_QUEUES];
+//	struct queue *q;
+//	//@delee
+//	//make receivers
+//        for (int i = 0; i < NUM_QUEUES; i++) {
+////		q[i] = get_queue(i);
+//		q = get_queue(i);
+//		pthread_create(&receiver[i], NULL, process_receiver, &i);
+//                printf("%s: start on %d\n", __func__, i);
+////		sleep(1);
+//        }
+//
+//	int cnt = 0;
+//	//@delee
+//	//check queue
+//	int current_q = 0;
+//        while(true){
+////		printf("%s: recv %d!\n", __func__, cpu);
+////		rdma_recv_wr(q[current_q], &q[current_q]->ctrl->servermr);
+//		q = get_queue(current_q);
+//		rdma_recv_wr(q, &q->ctrl->servermr);
+//		printf("Message arriving in queue %d\n", current_q);
+////		rdma_poll_cq(q[current_q]->cq, 1);
+//		current_q = (current_q + 1) % NUM_QUEUES;
+//		printf("%s: done %d!\n", __func__, current_q);
+//		atomic_fetch_add(&wr_check[cnt], 1);
+//		cnt++;
+////		}
+//        }
+//}
 
 static void *process_worker(void *arg)
 {
@@ -124,9 +121,6 @@ int main(int argc, char* argv[])
 	s_addr.sin_family = AF_INET;
 
 	pthread_create(&server_init, NULL, process_server_init, NULL);
-	//@delee
-	//TODO!!!
-	//It is has error!!!
 	while (rdma_status != RDMA_CONNECT);
 
 	printf("The server is connected successfully\n");
@@ -134,13 +128,15 @@ int main(int argc, char* argv[])
 	sleep(2);
 
 	pthread_create(&worker, NULL, process_worker, NULL);
-//      pthread_create(&receiver, NULL, process_receiver, NULL);
-//	for (int i = 0; i < NUM_QUEUES; i++) {
-//		pthread_create(&receiver[i], NULL, process_receiver, &i);
+//	pthread_create(&receiver, NULL, process_receiver, NULL);
+	for (int i = 0; i < NUM_QUEUES; i++) {
+		pthread_create(&receiver[i], NULL, process_receiver, &i);
 //		sleep(1);
-//	}
-	pthread_create(&receiver_manager, NULL, process_receiver_manager, NULL);
+ 	}
+
+//	pthread_create(&receiver_manager, NULL, process_receiver_manager, NULL);
 
 	pthread_join(server_init, NULL);
+	printf("%s: It is OK!!!.\n", __func__);
 	return ret;
 }

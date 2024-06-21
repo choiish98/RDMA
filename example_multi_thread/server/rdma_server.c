@@ -23,12 +23,12 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 
 	printf("%s\n", __func__);
 
-	//@delee
-	//Lock for selecting of Queue
-	pthread_mutex_lock(&queue_lock);
+//	//@delee
+//	//Lock for selecting of Queue
+//	pthread_mutex_lock(&queue_lock);
 	q = &server_session->queues[queue_ctr];
-	queue_ctr = (queue_ctr + 1) % NUM_QUEUES;	// NUM_QUEUES is a number of avaiable queue
-	pthread_mutex_unlock(&queue_lock);
+//	queue_ctr = (queue_ctr+1) % NUM_QUEUES;	// NUM_QUEUES is a number of avaiable queue
+//	pthread_mutex_unlock(&queue_lock);
 
 	id->context = q;
 	q->cm_id = id;
@@ -134,6 +134,8 @@ int start_rdma_server(struct sockaddr_in s_addr)
 
 	//Process connection requests and other events
 //	for (i = 0; i < NUM_QUEUES; i++) {
+
+
 	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
 
@@ -142,6 +144,7 @@ int start_rdma_server(struct sockaddr_in s_addr)
 
 		if (on_event(&event_copy))
 			break;
+//		queue_ctr = (queue_ctr+1) % NUM_QUEUES;
 	}
 //	}
 
