@@ -1,19 +1,20 @@
 #include "rdma_common.h"
 #include "rdma_client.h"
 
-//pthread_t client_init;
+pthread_t client_init;
 pthread_t worker[NUM_QUEUES];
 
 struct sockaddr_in s_addr;
 int rdma_status;
 extern struct ctrl client_session;
 
-//static void *process_client_init(void *arg)
-//{
-//	rdma_status = RDMA_INIT;
-//	start_rdma_client(&s_addr);
+static void *process_client_init(void *arg)
+{
+	rdma_status = RDMA_INIT;
+//	TEST_NZ(start_rdma_client(&s_addr));
+	start_rdma_client(&s_addr);
 //	while (rdma_status == RDMA_CONNECT);
-//}
+}
 
 static void *simulator(void *arg)
 {
@@ -22,12 +23,20 @@ static void *simulator(void *arg)
 
 	printf("%s: start on %d\n", __func__, cpu);
 
-	for (int i = 0; i <= 100; i++) {
+//	for (int i = 0; i <= 100; i++) {
+	int i = 0 ;
+	while(true){
 		printf("%s: req %d on %d\n", __func__, i, cpu);
 		rdma_send_wr(q, IBV_WR_SEND, &q->ctrl->servermr, NULL);
 		rdma_poll_cq(q->cq, 1);
 		printf("%s: done %d on %d\n", __func__, i, cpu);
+		i++;
+		if(i ==100){
+                        break;
+                        printf("%s: i is 100 in while %d\n", __func__, cpu);
+                }
 	}
+	printf("%s: end of while %d\n", __func__, cpu);
 
 //	rdma_status = RDMA_DISCONNECT;
 }
@@ -71,25 +80,26 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-//	pthread_create(&client_init, NULL, process_client_init, NULL);
-//	while (rdma_status != RDMA_CONNECT);
-	
-	TEST_NZ(start_rdma_client(&s_addr));
+	pthread_create(&client_init, NULL, process_client_init, NULL);
+	while (rdma_status != RDMA_CONNECT);
+
+//	TEST_NZ(start_rdma_client(&s_addr));
 
 	// Client is connected with server throught RDMA from now.
 	// From now on, You can do what you want to do with RDMA.
 	printf("The client is connected successfully\n");
 
-	printf("%s: before simulator\n", __func__);
 	int i = 0;
         while(true){
                 if(i >= NUM_QUEUES)
                         break;
 		pthread_create(&worker[i], NULL, simulator, &i);
+		printf("%s: make simulator %d\n", __func__, i);
 		sleep(1);
+		i++;
 	}
-
-//	pthread_join(client_init, NULL);
-
+	while (rdma_status == RDMA_CONNECT);
+	pthread_join(client_init, NULL);
+//	while (rdma_status == RDMA_CONNECT);
 	return 0;
 }

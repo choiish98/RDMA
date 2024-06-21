@@ -9,7 +9,7 @@ int queue_ctr = 0;
 char client_memory[PAGE_SIZE]; 
 struct ibv_mr *client_mr;
 
-//extern int rdma_status;
+extern int rdma_status;
 
 static int on_addr_resolved(struct rdma_cm_id *id)
 {
@@ -111,7 +111,7 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 		}
 	}
 
-//	rdma_status = RDMA_CONNECT;
+	rdma_status = RDMA_CONNECT;
 	return 0;
 }
 
