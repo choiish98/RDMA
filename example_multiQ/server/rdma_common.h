@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -16,8 +17,6 @@
 
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
-
-#define RDMA_CLIENT
 
 #define TEST_NZ(x) do { \
     if (x) { \
@@ -36,8 +35,7 @@
 #define true 1
 #define false 0
 
-//#define NUM_QUEUES 2
-#define NUM_QUEUES 1
+#define NUM_QUEUES 2
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128
@@ -81,7 +79,6 @@ struct ctrl {
 int rdma_alloc_session(struct ctrl **session);
 int rdma_create_device(struct queue *q);
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc);
-//int rdma_modify_qp(struct queue *q);
 int rdma_create_mr(struct ibv_pd *pd);
 
 int rdma_poll_cq(struct ibv_cq *cq, int total);
