@@ -3,7 +3,7 @@
 
 pthread_t client_init;
 pthread_t worker[NUM_QUEUES];
-struct queue *q[NUM_QUEUES];
+
 struct sockaddr_in s_addr;
 int rdma_status;
 extern struct ctrl client_session;
@@ -31,35 +31,6 @@ static void simulator(void *arg)
 
       rdma_status = RDMA_DISCONNECT;
 }
-
-////static void *simulator(void *arg)
-//static void simulator(void *arg)
-//{
-//	//@delee
-//	//make receivers
-//        for (int i = 0; i < NUM_QUEUES; i++) {
-//		q[i] = get_queue(i);
-//        }
-//
-//	printf("%s: start on\n", __func__);
-//
-//	//@delee
-//	//check queue
-//	int current_q = 0;
-//
-//	for (int i = 0; i < 100; i++) {
-//		printf("%s: req %d on %d\n", __func__, i, current_q);
-////		printf("req\n");
-//		printf("Message arriving in queue %d\n", current_q);
-//		rdma_send_wr(q[current_q], IBV_WR_SEND, &q[current_q]->ctrl->servermr, NULL);
-//		rdma_poll_cq(q[current_q]->cq, 1);
-//		printf("%s: done %d on %d\n", __func__, i, current_q);
-////		printf("%d done\n", i);
-//		current_q = (current_q + 1) % NUM_QUEUES;
-//	}
-//
-//	rdma_status = RDMA_DISCONNECT;
-//}
 
 static inline int get_addr(char *sip)
 {
@@ -99,11 +70,11 @@ int main(int argc, char* argv[])
 		usage();
 		return 0;
 	}
-	pthread_create(&client_init, NULL, process_client_init, NULL);
 
-	rdma_status = RDMA_INIT;
+	pthread_create(&client_init, NULL, process_client_init, NULL);
+	while (rdma_status != RDMA_CONNECT);
+
 //	start_rdma_client(&s_addr);
-//	while (rdma_status != RDMA_CONNECT);
 	TEST_NZ(start_rdma_client(&s_addr));
 
 	// Client is connected with server throught RDMA from now.
@@ -113,11 +84,10 @@ int main(int argc, char* argv[])
 		pthread_create(&worker[i], NULL, simulator, &i);
 		sleep(1);
 	}
-printf("It's OK!!!");
+
  	pthread_join(client_init, NULL);
 	sleep(1);
-//        simulator(NULL);
-	
+        simulator(NULL);
 
 	return 0;
 }
