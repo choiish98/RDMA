@@ -12,7 +12,7 @@ extern struct ctrl client_session;
 //{
 //	rdma_status = RDMA_INIT;
 //	start_rdma_client(&s_addr);
-////	while (rdma_status == RDMA_CONNECT);
+//	while (rdma_status == RDMA_CONNECT);
 //}
 
 static void *simulator(void *arg)
@@ -29,7 +29,7 @@ static void *simulator(void *arg)
 		printf("%s: done %d on %d\n", __func__, i, cpu);
 	}
 
-	rdma_status = RDMA_DISCONNECT;
+//	rdma_status = RDMA_DISCONNECT;
 }
 
 static inline int get_addr(char *sip)
@@ -50,7 +50,7 @@ static void usage(void)
 
 int main(int argc, char* argv[])
 {
-	int ret, option;
+	int option;
 
 	while ((option = getopt(argc, argv, "i:p:")) != -1) {
 		switch (option) {
@@ -68,18 +68,19 @@ int main(int argc, char* argv[])
 
 	if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) {
 		usage();
-		return ret;
+		return 0;
 	}
 
 //	pthread_create(&client_init, NULL, process_client_init, NULL);
-	while (rdma_status != RDMA_CONNECT);
+//	while (rdma_status != RDMA_CONNECT);
 	
-//	TEST_NZ(start_rdma_client(&s_addr));
+	TEST_NZ(start_rdma_client(&s_addr));
 
 	// Client is connected with server throught RDMA from now.
 	// From now on, You can do what you want to do with RDMA.
 	printf("The client is connected successfully\n");
 
+	printf("%s: before simulator\n", __func__);
 	int i = 0;
         while(true){
                 if(i >= NUM_QUEUES)
