@@ -36,8 +36,8 @@
 #define true 1
 #define false 0
 
-//#define NUM_QUEUES 2
-#define NUM_QUEUES 1
+#define NUM_QUEUES 2
+//#define NUM_QUEUES 1
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128

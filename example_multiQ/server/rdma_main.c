@@ -3,7 +3,6 @@
 
 pthread_t server_init;
 pthread_t receiver[NUM_QUEUES];
-//pthread_t receiver;
 pthread_t worker;
 
 struct sockaddr_in s_addr;
