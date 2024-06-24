@@ -70,14 +70,18 @@ int main(int argc, char* argv[])
     pthread_create(&server_init, NULL, process_server_init, NULL);
     while (rdma_status != RDMA_CONNECT);
 
-    for (int i = 0; i < NUM_QUEUES; i++) {
+    int i = 0;
+    while (i < NUM_QUEUES) {
         int *cpu = malloc(sizeof(int));
         *cpu = i;
         pthread_create(&worker[i], NULL, handler, cpu);
+        i++;
     }
 
-    for (int i = 0; i < NUM_QUEUES; i++) {
+    i = 0;
+    while (i < NUM_QUEUES) {
         pthread_join(worker[i], NULL);
+        i++;
     }
 
     return 0;
