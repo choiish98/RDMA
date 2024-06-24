@@ -2,100 +2,83 @@
 #include "rdma_server.h"
 
 pthread_t server_init;
-pthread_t receiver[NUM_QUEUES];
-pthread_t worker;
+pthread_t worker[NUM_QUEUES];
 
 struct sockaddr_in s_addr;
 int rdma_status;
-
-//
-atomic_int wr_check[100];
+extern struct ctrl server_session;
 
 static void *process_server_init(void *arg)
 {
-	rdma_status = RDMA_INIT;
-	start_rdma_server(s_addr);
+    rdma_status = RDMA_INIT;
+    start_rdma_server(s_addr);
 }
 
-static void *process_receiver(void *arg)
+static void *handler(void *arg)
 {
-	int cpu = *(int *)arg;
-	struct queue *q = get_queue(cpu);
-//	struct queue *q = get_queue(0);
-//
-	int cnt = 0;
-//	printf("%s: start on %d\n", __func__, cpu);
+    int cpu = *(int *)arg;
+    struct queue *q = get_queue(cpu);
 
-//	for (int i = 0; i < 100; i++) {
-	while(true){
-//	  	printf("%s: recv %d on %d!\n", __func__, i, cpu);
-		rdma_recv_wr(q, &q->ctrl->servermr);
-		rdma_poll_cq(q->cq, 1);
-//		printf("%s: done %d on %d!\n", __func__, i, cpu);
+    printf("%s: start on %d\n", __func__, cpu);
 
-		atomic_fetch_add(&wr_check[cnt], 1);
-		cnt++;
-	}
+    while (true) {
+        rdma_poll_cq(q->cq, 1);
+        printf("%s: completed work on queue %d\n", __func__, cpu);
+    }
+    printf("%s: end on %d\n", __func__, cpu);
 }
 
-//
-static void *process_worker(void *arg)
+static inline int get_addr(char *sip)
 {
-        int idx = 0;
+    struct addrinfo *info;
 
-        while (true) {
-                if (!atomic_load(&wr_check[idx]))
-                        continue;
-
-                printf("worker %d on!\n", idx);
-                idx++;
-        }
+    TEST_NZ(getaddrinfo(sip, NULL, NULL, &info));
+    memcpy(&s_addr, info->ai_addr, sizeof(struct sockaddr_in));
+    freeaddrinfo(info);
+    return 0;
 }
-
 
 static void usage(void)
 {
-	printf("[Usage] : ");
-	printf("./rdma_main [-port <server port>]\n");
-	exit(1);
+    printf("[Usage] : ");
+    printf("./rdma_main [-i <server ip>] [-p <server port>]\n");
 }
 
 int main(int argc, char* argv[])
 {
-	int ret, option;
+    int option;
 
-	while ((option = getopt(argc, argv, "p:")) != -1) {
-		switch (option) {
-			case 'p':
-				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
-				printf("%s: listening on port %s.\n", __func__, optarg);
-				break;
-			default:
-				usage();
-				break;
-		}
-	}
+    while ((option = getopt(argc, argv, "i:p:")) != -1) {
+        switch (option) {
+            case 'i':
+                TEST_NZ(get_addr(optarg));
+                break;
+            case 'p':
+                s_addr.sin_port = htons(strtol(optarg, NULL, 0));
+                break;
+            default:
+                usage();
+                return 0;
+        }
+    }
 
-	if (!s_addr.sin_port) {
-		usage();
-		return ret;
-	}
-	s_addr.sin_family = AF_INET;
+    if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) {
+        usage();
+        return 0;
+    }
 
-	pthread_create(&server_init, NULL, process_server_init, NULL);
-	while (rdma_status != RDMA_CONNECT);
+    pthread_create(&server_init, NULL, process_server_init, NULL);
+    while (rdma_status != RDMA_CONNECT);
 
-	printf("The server is connected successfully\n");
-        sleep(2);
+    for (int i = 0; i < NUM_QUEUES; i++) {
+        int *cpu = malloc(sizeof(int));
+        *cpu = i;
+        pthread_create(&worker[i], NULL, handler, cpu);
+    }
 
-        pthread_create(&worker, NULL, process_worker, NULL);
-	int i = 0;
-	while(true){
-		if(i == NUM_QUEUES)
-			break;
-		pthread_create(&receiver[i], NULL, process_receiver, &i);
-		sleep(1);
-	}
-	pthread_join(server_init, NULL);
-	return ret;
+    for (int i = 0; i < NUM_QUEUES; i++) {
+        pthread_join(worker[i], NULL);
+    }
+
+    return 0;
 }
