@@ -1,5 +1,7 @@
 #include "rdma_common.h"
 
+//@delee
+//TODO!!!
 #ifdef RDMA_CLIENT
 const unsigned int MAX_SGE = 1024;
 const unsigned int MAX_WR = 1;
@@ -16,25 +18,25 @@ int rdma_alloc_session(struct ctrl **session)
 {
 	int i;
 
-    *session = (struct ctrl *) malloc(sizeof(struct ctrl));
-    if (!*session) {
-        printf("%s: malloc server_session failed\n", __func__);
-        return -EINVAL;
-    }
-    memset(*session, 0, sizeof(struct ctrl));
+	*session = (struct ctrl *) malloc(sizeof(struct ctrl));
+	if (!*session) {
+		printf("%s: malloc server_session failed\n", __func__);
+		return -EINVAL;
+	}
+	memset(*session, 0, sizeof(struct ctrl));
 
-    (*session)->queues = (struct queue *) malloc(sizeof(struct queue) * NUM_QUEUES);    
+	(*session)->queues = (struct queue *) malloc(sizeof(struct queue) * NUM_QUEUES);
 	if (!(*session)->queues) {
-        printf("%s: malloc queues failed\n", __func__);
-        return -EINVAL;
-    }
-    memset((*session)->queues, 0, sizeof(struct queue) * NUM_QUEUES);
+		printf("%s: malloc queues failed\n", __func__);
+		return -EINVAL;
+	}
+	memset((*session)->queues, 0, sizeof(struct queue) * NUM_QUEUES);
 
-    for (i = 0; i < NUM_QUEUES; i++) {
-        (*session)->queues[i].ctrl = *session;
-    }
+	for (i = 0; i < NUM_QUEUES; i++) {
+		(*session)->queues[i].ctrl = *session;
+	}
 
-    return 0;
+	return 0;
 }
 
 int rdma_create_device(struct queue *q)
@@ -42,52 +44,99 @@ int rdma_create_device(struct queue *q)
 	struct device *dev;
 
 	dev = (struct device *) malloc(sizeof(*dev));
+
 	if (!dev) {
-        printf("%s: malloc dev failed\n", __func__);
-        return -EINVAL;
-    }
+		printf("%s: malloc dev failed\n", __func__);
+		return -EINVAL;
+	}
 
-    dev->verbs = q->cm_id->verbs;
-    dev->pd = ibv_alloc_pd(dev->verbs);
-    if (!dev->pd) {
-        printf("%s: ibv_allod_pd failed\n", __func__);
-        return -EINVAL;
-    }
+	dev->verbs = q->cm_id->verbs;
+	dev->pd = ibv_alloc_pd(dev->verbs);
+	if (!dev->pd) {
+		printf("%s: ibv_allod_pd failed\n", __func__);
+	return -EINVAL;
+	}
 
-    q->ctrl->dev = dev;
-
+	q->ctrl->dev = dev;
 	return 0;
 }
 
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
 {
-    struct ibv_qp_init_attr qp_attr = {};
+	struct ibv_qp_init_attr qp_attr = {};
 
 	if (!cc) {
 		cc = ibv_create_comp_channel(q->cm_id->verbs);
 		TEST_NZ((cc == NULL));
+//		//@delee
+//		//It is a client side code.
+//		if (!cc) {
+//			printf("%s: ibv_create_comp_channel failed\n", __func__);
+//			return -EINVAL;
+//		}
 	}
 
-    q->cq = ibv_create_cq(q->cm_id->verbs,
-            CQ_CAPACITY,
-            NULL,
-            cc,
-            0);
+	q->cq = ibv_create_cq(q->cm_id->verbs,
+		CQ_CAPACITY,
+		NULL,
+		cc,
+		0);
 	TEST_NZ((q->cq == NULL));
-    TEST_NZ(ibv_req_notify_cq(q->cq, 0));
+//	//@delee
+//	//It is a client side code.
+//	if(!q->cq) {
+//		printf("%s: ibv_create_cq failed\n", __func__);
+//		return -EINVAL;
+//	}
 
-    qp_attr.send_cq = q->cq;
-    qp_attr.recv_cq = q->cq;
-    qp_attr.qp_type = IBV_QPT_RC;
-    qp_attr.cap.max_send_wr = MAX_SGE;
-    qp_attr.cap.max_recv_wr = MAX_SGE;
-    qp_attr.cap.max_send_sge = MAX_WR;
-    qp_attr.cap.max_recv_sge = MAX_WR;
+	TEST_NZ(ibv_req_notify_cq(q->cq, 0));
+//	//@delee
+//	//It is a client side code.
+//	ret = ibv_req_notify_cq(q->cq, 0);
+//	if (ret) {
+//		printf("%s: ibv_req_notify_cq failed \n", __func__);
+//		return ret;
+//	}
 
-    TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
-    q->qp = q->cm_id->qp;
+	qp_attr.send_cq = q->cq;
+	qp_attr.recv_cq = q->cq;
+	qp_attr.qp_type = IBV_QPT_RC;
+	qp_attr.cap.max_send_wr = MAX_SGE;
+	qp_attr.cap.max_recv_wr = MAX_SGE;
+	qp_attr.cap.max_send_sge = MAX_WR;
+	qp_attr.cap.max_recv_sge = MAX_WR;
+
+	TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
+//      //@delee
+//      //It is a client side code.
+//	rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
+//	if (ret) {
+//		printf("%s: rdma_create_qp failed\n", __func__);
+//		return ret;
+//	}
+
+	q->qp = q->cm_id->qp;
 	return 0;
 }
+
+
+//@delee
+//It is a client side code.
+int rdma_modify_qp(struct queue *q)
+{
+        struct ibv_qp_attr attr;
+
+        memset(&attr, 0, sizeof(struct ibv_qp_attr));
+        attr.pkey_index = 0;
+
+        if (ibv_modify_qp(q->qp, &attr, IBV_QP_PKEY_INDEX)) {
+                printf("%s: ibv_modify_qp failed \n", __func__);
+                return 1;
+        }
+
+        return 0;
+}
+
 
 int rdma_create_mr(struct ibv_pd *pd)
 {
@@ -150,15 +199,26 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 	struct ibv_recv_wr *bad_wr = NULL;
 	struct ibv_recv_wr wr = {};
 	struct ibv_sge sge = {};
+	int ret;
 
+	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
 	sge.lkey = sge_mr->stag.lkey;
 
+	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 
 	TEST_NZ(ibv_post_recv(q->qp, &wr, &bad_wr));
+	//@delee
+	//It is a client side code.
+	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
+	if (ret) {
+		printf("%s: ib_post_recv failed\n", __func__);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -168,11 +228,14 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 	struct ibv_send_wr *bad_wr = NULL;
 	struct ibv_send_wr wr = {};
 	struct ibv_sge sge = {};
+	int ret;
 
+	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
 	sge.lkey = sge_mr->stag.lkey;
 
+	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 	wr.opcode = opcode;
@@ -183,5 +246,12 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 	}
 
 	TEST_NZ(ibv_post_send(q->qp, &wr, &bad_wr));
+	//@delee
+	//It is a client side code.
+	ret = ibv_post_send(q->qp, &wr, &bad_wr);
+	if (ret) {
+		printf("%s: ibv_post_send failed\n", __func__);
+		return ret;
+	}
 	return 0;
 }

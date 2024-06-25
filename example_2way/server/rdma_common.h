@@ -18,6 +18,8 @@
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
 
+//#define RDMA_CLIENT
+
 #define TEST_NZ(x) do { \
     if (x) { \
         printf("%s: failed at %d \n", __func__, __LINE__); \
@@ -35,7 +37,8 @@
 #define true 1
 #define false 0
 
-#define NUM_QUEUES 2
+//#define NUM_QUEUES 2
+#define NUM_QUEUES 1
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128
