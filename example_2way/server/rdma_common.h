@@ -9,7 +9,6 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include <pthread.h>
 
 #include <netdb.h>
 #include <netinet/in.h>

@@ -45,47 +45,47 @@ int rdma_create_device(struct queue *q)
 	if (!dev) {
         printf("%s: malloc dev failed\n", __func__);
         return -EINVAL;
-	}
+    }
 
-	dev->verbs = q->cm_id->verbs;
-	dev->pd = ibv_alloc_pd(dev->verbs);
-	if (!dev->pd) {
-		printf("%s: ibv_allod_pd failed\n", __func__);
-		return -EINVAL;
-	}
+    dev->verbs = q->cm_id->verbs;
+    dev->pd = ibv_alloc_pd(dev->verbs);
+    if (!dev->pd) {
+        printf("%s: ibv_allod_pd failed\n", __func__);
+        return -EINVAL;
+    }
 
-	q->ctrl->dev = dev;
+    q->ctrl->dev = dev;
 
 	return 0;
 }
 
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
 {
-	struct ibv_qp_init_attr qp_attr = {};
+    struct ibv_qp_init_attr qp_attr = {};
 
 	if (!cc) {
 		cc = ibv_create_comp_channel(q->cm_id->verbs);
 		TEST_NZ((cc == NULL));
 	}
 
-	q->cq = ibv_create_cq(q->cm_id->verbs,
-		CQ_CAPACITY,
-		NULL,
-		cc,
-		0);
+    q->cq = ibv_create_cq(q->cm_id->verbs,
+            CQ_CAPACITY,
+            NULL,
+            cc,
+            0);
 	TEST_NZ((q->cq == NULL));
-	TEST_NZ(ibv_req_notify_cq(q->cq, 0));
+    TEST_NZ(ibv_req_notify_cq(q->cq, 0));
 
-	qp_attr.send_cq = q->cq;
-	qp_attr.recv_cq = q->cq;
-	qp_attr.qp_type = IBV_QPT_RC;
-	qp_attr.cap.max_send_wr = MAX_SGE;
-	qp_attr.cap.max_recv_wr = MAX_SGE;
-	qp_attr.cap.max_send_sge = MAX_WR;
-	qp_attr.cap.max_recv_sge = MAX_WR;
+    qp_attr.send_cq = q->cq;
+    qp_attr.recv_cq = q->cq;
+    qp_attr.qp_type = IBV_QPT_RC;
+    qp_attr.cap.max_send_wr = MAX_SGE;
+    qp_attr.cap.max_recv_wr = MAX_SGE;
+    qp_attr.cap.max_send_sge = MAX_WR;
+    qp_attr.cap.max_recv_sge = MAX_WR;
 
-	TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
-	q->qp = q->cm_id->qp;
+    TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
+    q->qp = q->cm_id->qp;
 	return 0;
 }
 
