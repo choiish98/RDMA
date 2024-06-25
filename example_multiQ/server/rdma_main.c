@@ -2,104 +2,101 @@
 #include "rdma_server.h"
 
 pthread_t server_init;
-pthread_t worker[NUM_QUEUES];
+pthread_t receiver[NUM_QUEUES];
+pthread_t worker;
 
 struct sockaddr_in s_addr;
 int rdma_status;
-extern struct ctrl server_session;
+
+//
+atomic_int wr_check[100];
 
 static void *process_server_init(void *arg)
 {
-    rdma_status = RDMA_INIT;
-    start_rdma_server(s_addr);
-    return NULL;
+	rdma_status = RDMA_INIT;
+	start_rdma_server(s_addr);
 }
 
-static void *handler(void *arg)
+static void *process_receiver(void *arg)
 {
-    int cpu = *(int *)arg;
-    struct queue *q = get_queue(cpu);
+	int cpu = *(int *)arg;
+	struct queue *q = get_queue(cpu);
+//	struct queue *q = get_queue(0);
+//
+	int cnt = 0;
 
-    if (q == NULL) {
-        printf("handler: Failed to get queue for CPU %d\n", cpu);
-        return NULL;
-    }
+	printf("%s: start on %d\n", __func__, cpu);
 
-    printf("%s: start on %d\n", __func__, cpu);
+//	for (int i = 0; i < 100; i++) {
+	while(true){
+//	  	printf("%s: recv %d on %d!\n", __func__, i, cpu);
+		rdma_recv_wr(q, &q->ctrl->servermr);
+		rdma_poll_cq(q->cq, 1);
+//		printf("%s: done %d on %d!\n", __func__, i, cpu);
 
-    while (true) {
-        rdma_poll_cq(q->cq, 1);
-        printf("%s: completed work on queue %d\n", __func__, cpu);
-    }
-    printf("%s: end on %d\n", __func__, cpu);
-    return NULL;
+		atomic_fetch_add(&wr_check[cnt], 1);
+		cnt++;
+	}
 }
 
-static inline int get_addr(char *sip)
+//
+static void *process_worker(void *arg)
 {
-    struct addrinfo *info;
+        int idx = 0;
 
-    if (getaddrinfo(sip, NULL, NULL, &info) != 0) {
-        printf("Failed to get address info for %s\n", sip);
-        return -1;
-    }
-    memcpy(&s_addr, info->ai_addr, sizeof(struct sockaddr_in));
-    freeaddrinfo(info);
-    return 0;
+        while (true) {
+                if (!atomic_load(&wr_check[idx]))
+                        continue;
+
+                printf("worker %d on!\n", idx);
+                idx++;
+        }
 }
+
 
 static void usage(void)
 {
-    printf("[Usage] : ");
-    printf("./rdma_main [-i <server ip>] [-p <server port>]\n");
+	printf("[Usage] : ");
+	printf("./rdma_main [-port <server port>]\n");
+	exit(1);
 }
 
 int main(int argc, char* argv[])
 {
-    int option;
+	int ret, option;
 
-    while ((option = getopt(argc, argv, "i:p:")) != -1) {
-        switch (option) {
-            case 'i':
-                if (get_addr(optarg) != 0) {
-                    usage();
-                    return 1;
-                }
-                break;
-            case 'p':
-                s_addr.sin_port = htons(strtol(optarg, NULL, 0));
-                break;
-            default:
-                usage();
-                return 1;
-        }
-    }
+	while ((option = getopt(argc, argv, "p:")) != -1) {
+		switch (option) {
+			case 'p':
+				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
+				printf("%s: listening on port %s.\n", __func__, optarg);
+				break;
+			default:
+				usage();
+				break;
+		}
+	}
 
-    if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) {
-        usage();
-        return 1;
-    }
+	if (!s_addr.sin_port) {
+		usage();
+		return ret;
+	}
+	s_addr.sin_family = AF_INET;
 
-    pthread_create(&server_init, NULL, process_server_init, NULL);
-    while (rdma_status != RDMA_CONNECT);
+	pthread_create(&server_init, NULL, process_server_init, NULL);
+	while (rdma_status != RDMA_CONNECT);
 
-    int i = 0;
-    while (i < NUM_QUEUES) {
-        int *cpu = malloc(sizeof(int));
-        if (cpu == NULL) {
-            printf("Failed to allocate memory for CPU %d\n", i);
-            return 1;
-        }
-        *cpu = i;
-        pthread_create(&worker[i], NULL, handler, cpu);
-        i++;
-    }
+	printf("The server is connected successfully\n");
+        sleep(2);
 
-    i = 0;
-    while (i < NUM_QUEUES) {
-        pthread_join(worker[i], NULL);
-        i++;
-    }
-
-    return 0;
+        pthread_create(&worker, NULL, process_worker, NULL);
+	int i = 0;
+	while(true){
+		if(i == NUM_QUEUES)
+			break;
+		pthread_create(&receiver[i], NULL, process_receiver, &i);
+		sleep(1);
+	}
+	pthread_join(server_init, NULL);
+	return ret;
 }
