@@ -82,6 +82,7 @@ struct ctrl {
 int rdma_alloc_session(struct ctrl **session);
 int rdma_create_device(struct queue *q);
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc);
+//int rdma_modify_qp(struct queue *q);
 int rdma_create_mr(struct ibv_pd *pd);
 
 int rdma_poll_cq(struct ibv_cq *cq, int total);

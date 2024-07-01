@@ -1,21 +1,20 @@
 #include "rdma_server.h"
 
 struct ctrl *server_session;
-struct ibv_comp_channel *cc;
-struct rdma_event_channel *ec;
+extern struct ibv_comp_channel *cc;
+struct rdma_event_channel *s_ec;
 struct rdma_cm_id *listener;
-int queue_ctr = 0;
 
 char server_memory[PAGE_SIZE];
 struct ibv_mr *server_mr;
 
-extern int rdma_status;
+extern int rdma_server_status;
 
 static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *param)
 {
 	struct rdma_conn_param cm_params = {};
 	struct ibv_device_attr attrs = {};
-	struct queue *q = &server_session->queues[queue_ctr++];
+	struct queue *q = &server_session->queues[1];
 
 	printf("%s\n", __func__);
 
@@ -24,7 +23,7 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 
 	if (!q->ctrl->dev) 
 		TEST_NZ(rdma_create_device(q));
-	TEST_NZ(rdma_create_queue(q, cc));
+//	TEST_NZ(rdma_create_queue(q, cc));
 	TEST_NZ(ibv_query_device(q->ctrl->dev->verbs, &attrs));
 
 	cm_params.initiator_depth = param->initiator_depth;
@@ -68,7 +67,7 @@ static int on_disconnect(struct queue *q)
 	rdma_destroy_qp(q->cm_id);
 	ibv_destroy_cq(q->cq);
 	rdma_destroy_id(q->cm_id);
-	rdma_destroy_event_channel(ec);
+	rdma_destroy_event_channel(s_ec);
 	ibv_dealloc_pd(server_session->dev->pd);
 	free(server_session->dev);
 	server_session->dev = NULL;
@@ -103,14 +102,19 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	int i;
 
 	TEST_NZ(rdma_alloc_session(&server_session));
-	ec = rdma_create_event_channel();
-	TEST_NZ((ec == NULL));
-	TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
+	s_ec = rdma_create_event_channel();
+	TEST_NZ((s_ec == NULL));
+	TEST_NZ(rdma_create_id(s_ec, &listener, NULL, RDMA_PS_TCP));
 	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
 	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
 
-//	for (i = 0; i < NUM_QUEUES; i++) {
-	while (!rdma_get_cm_event(ec, &event)) {
+	while (!rdma_get_cm_event(s_ec, &event)) {
+
+//	#include <rdma/rdma_cma.h>
+//	int rdma_get_cm_event(struct rdma_event_channel *channel, struct rdma_cm_event **event);
+//	The rdma_get_cm_event function retrieves a communication event.
+//	If no events are pending, the call is blocked until an event is received
+
 		struct rdma_cm_event event_copy;
 
 		memcpy(&event_copy, event, sizeof(*event));
@@ -119,7 +123,6 @@ int start_rdma_server(struct sockaddr_in s_addr)
 		if (on_event(&event_copy))
 			break;
 	}
-//	}
 
 //	TEST_NZ(rdma_create_mr(server_session->dev->pd));
 //	mr.addr = (uint64_t) server_mr->addr;
@@ -134,9 +137,9 @@ int start_rdma_server(struct sockaddr_in s_addr)
 //	server_session->servermr.length = sizeof(struct mr_attr);
 //	server_session->servermr.stag.lkey = server_mr->lkey;
 
-	rdma_status = RDMA_CONNECT;
+	rdma_server_status = RDMA_CONNECT;
 
-	while (!rdma_get_cm_event(ec, &event)) {
+	while (!rdma_get_cm_event(s_ec, &event)) {
 		struct rdma_cm_event event_copy;
 
 		memcpy(&event_copy, event, sizeof(*event));
@@ -149,7 +152,7 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	return 0;
 }
 
-struct queue *get_queue(int idx)
+struct queue *get_queue_server(int idx)
 {
 	return &server_session->queues[idx];
 }

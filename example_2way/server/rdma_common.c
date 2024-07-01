@@ -255,3 +255,9 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 	}
 	return 0;
 }
+
+//struct queue *get_queue(int idx, struct ctrl *ctrl_q)
+//{
+//	return &ctrl_q->queues[idx];
+//}
+ 

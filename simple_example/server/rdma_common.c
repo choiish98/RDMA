@@ -62,7 +62,7 @@ int rdma_create_device(struct queue *q)
 int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
 {
     struct ibv_qp_init_attr qp_attr = {};
-
+//	printf("%s: cc: %s\n", __func__, cc);
 	if (!cc) {
 		cc = ibv_create_comp_channel(q->cm_id->verbs);
 		TEST_NZ((cc == NULL));
