@@ -9,6 +9,7 @@ pthread_t worker_s;
 pthread_t worker_c;
 
 struct sockaddr_in s_addr;
+struct sockaddr_in c_addr;
 int rdma_server_status;
 int rdma_client_status;
 extern struct ctrl client_session;
@@ -31,7 +32,7 @@ static void *process_client_init(void *arg)
 	// To be change &s_addr to something
 	// currently this variable for server
 //	printf("s_addr: %s\n",s_addr);
-        start_rdma_client(&s_addr);
+        start_rdma_client(&c_addr);
 //      while (rdma_status == RDMA_CONNECT);
 }
 
@@ -65,7 +66,7 @@ static inline int get_addr(char *sip)
         struct addrinfo *info;
 
         TEST_NZ(getaddrinfo(sip, NULL, NULL, &info));
-        memcpy(&s_addr, info->ai_addr, sizeof(struct sockaddr_in));
+        memcpy(&c_addr, info->ai_addr, sizeof(struct sockaddr_in));
         freeaddrinfo(info);
         return 0;
 }
@@ -125,6 +126,7 @@ int main(int argc, char* argv[])
 				break;
 			case 'p':
 				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
+				c_addr.sin_port = htons(strtol(optarg, NULL, 0));
 				printf("%s: listening on port %s.\n", __func__, optarg);
 				break;
 			default:
@@ -133,7 +135,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (!s_addr.sin_port || !s_addr.sin_addr.s_addr) {
+	if (!s_addr.sin_port) {
 		usage();
 		return ret;
 	}
@@ -145,6 +147,7 @@ int main(int argc, char* argv[])
 	while (rdma_server_status != RDMA_CONNECT);
 	printf("The server is connected successfully\n");
 	while (rdma_client_status != RDMA_CONNECT);
+	TEST_NZ(start_rdma_client(&c_addr));
 	printf("The client is connected successfully\n");
         sleep(2);
 

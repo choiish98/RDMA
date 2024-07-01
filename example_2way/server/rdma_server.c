@@ -100,7 +100,7 @@ int start_rdma_server(struct sockaddr_in s_addr)
 	struct rdma_cm_event *event;
 //	struct mr_attr mr;
 	int i;
-
+	
 	TEST_NZ(rdma_alloc_session(&server_session));
 	s_ec = rdma_create_event_channel();
 	TEST_NZ((s_ec == NULL));
