@@ -144,6 +144,7 @@ int main(int argc, char* argv[])
 	//@delee
 	pthread_create(&server_init, NULL, process_server_init, NULL);
 	pthread_create(&client_init, NULL, process_client_init, NULL);
+	sleep(30);
 	while (rdma_server_status != RDMA_CONNECT);
 	printf("The server is connected successfully\n");
 	while (rdma_client_status != RDMA_CONNECT);
