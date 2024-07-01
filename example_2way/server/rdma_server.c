@@ -14,7 +14,7 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 {
 	struct rdma_conn_param cm_params = {};
 	struct ibv_device_attr attrs = {};
-	struct queue *q = &server_session->queues[1];
+	struct queue *q = &server_session->queues[0];
 
 	printf("%s\n", __func__);
 
