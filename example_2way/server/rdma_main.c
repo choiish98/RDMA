@@ -26,14 +26,15 @@ static void *process_server_init(void *arg)
 static void *process_client_init(void *arg)
 {
         rdma_client_status = RDMA_INIT;
-//      TEST_NZ(start_rdma_client(&s_addr));
+//	TEST_NZ(start_rdma_client(&c_addr));
 	//@delee
 	//TODO!!!
 	// To be change &s_addr to something
 	// currently this variable for server
-//	printf("s_addr: %s\n",s_addr);
+	printf("%s: start_rdma_client\n", __func__);
         start_rdma_client(&c_addr);
-//      while (rdma_status == RDMA_CONNECT);
+	printf("%s: compelete start_rdma_client\n", __func__);
+//	while (rdma_client_status == RDMA_CONNECT);
 }
 
 static void *simulator(void *arg)
@@ -144,7 +145,7 @@ int main(int argc, char* argv[])
 	//@delee
 	pthread_create(&server_init, NULL, process_server_init, NULL);
 	pthread_create(&client_init, NULL, process_client_init, NULL);
-	sleep(30);
+	sleep(120);
 	while (rdma_server_status != RDMA_CONNECT);
 	printf("The server is connected successfully\n");
 	while (rdma_client_status != RDMA_CONNECT);
