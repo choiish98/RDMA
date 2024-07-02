@@ -201,23 +201,23 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 	struct ibv_sge sge = {};
 	int ret;
 
-	bzero(&sge, sizeof(sge));
+//	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
 	sge.lkey = sge_mr->stag.lkey;
 
-	bzero(&wr, sizeof(wr));
+//	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 
 	TEST_NZ(ibv_post_recv(q->qp, &wr, &bad_wr));
 	//@delee
 	//It is a client side code.
-	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
-	if (ret) {
-		printf("%s: ib_post_recv failed\n", __func__);
-		return ret;
-	}
+//	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
+//	if (ret) {
+//		printf("%s: ib_post_recv failed\n", __func__);
+//		return ret;
+//	}
 
 	return 0;
 }
@@ -230,12 +230,12 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 	struct ibv_sge sge = {};
 	int ret;
 
-	bzero(&sge, sizeof(sge));
+//	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
 	sge.lkey = sge_mr->stag.lkey;
 
-	bzero(&wr, sizeof(wr));
+//	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 	wr.opcode = opcode;
@@ -246,13 +246,13 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 	}
 
 	TEST_NZ(ibv_post_send(q->qp, &wr, &bad_wr));
-	//@delee
-	//It is a client side code.
-	ret = ibv_post_send(q->qp, &wr, &bad_wr);
-	if (ret) {
-		printf("%s: ibv_post_send failed\n", __func__);
-		return ret;
-	}
+//	//@delee
+//	//It is a client side code.
+//	ret = ibv_post_send(q->qp, &wr, &bad_wr);
+//	if (ret) {
+//		printf("%s: ibv_post_send failed\n", __func__);
+//		return ret;
+//	}
 	return 0;
 }
 

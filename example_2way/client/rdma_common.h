@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -36,8 +37,8 @@
 #define true 1
 #define false 0
 
-#define NUM_QUEUES 2
-//#define NUM_QUEUES 1
+//#define NUM_QUEUES 2
+#define NUM_QUEUES 1
 
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128

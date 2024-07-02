@@ -9,9 +9,23 @@ extern struct ibv_mr *client_mr;
 //#else
 const unsigned int MAX_SGE = 64;
 const unsigned int MAX_WR = 32;
-//extern char server_memory[PAGE_SIZE];
-//extern struct ibv_mr *server_mr;
+extern char server_memory[PAGE_SIZE];
+extern struct ibv_mr *server_mr;
 //#endif
+
+void print_sockaddr_in(const struct sockaddr_in *addr) {
+        char ip[INET_ADDRSTRLEN];
+
+        if (inet_ntop(AF_INET, &(addr->sin_addr), ip, INET_ADDRSTRLEN) == NULL) {
+                perror("inet_ntop");
+                return;
+        }
+
+        int port = ntohs(addr->sin_port);
+
+        printf("IP: %s\n", ip);
+        printf("Port: %d\n", port);
+}
 
 int rdma_alloc_session(struct ctrl **session)
 {
@@ -27,7 +41,7 @@ int rdma_alloc_session(struct ctrl **session)
     (*session)->queues = (struct queue *) malloc(sizeof(struct queue) * NUM_QUEUES);    
 	if (!(*session)->queues) {
         printf("%s: malloc queues failed\n", __func__);
-        return -EINVAL;
+	return -EINVAL;
     }
     memset((*session)->queues, 0, sizeof(struct queue) * NUM_QUEUES);
 
@@ -67,10 +81,11 @@ int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
 
 	if (!cc) {
 		cc = ibv_create_comp_channel(q->cm_id->verbs);
-		if (!cc) {
-			printf("%s: ibv_create_comp_channel failed\n", __func__);
-			return -EINVAL;
-		}
+//		if (!cc) {
+//			printf("%s: ibv_create_comp_channel failed\n", __func__);
+//			return -EINVAL;
+//		}
+		TEST_NZ((cc == NULL));
 	}
 
     q->cq = ibv_create_cq(q->cm_id->verbs,
@@ -78,16 +93,19 @@ int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
             NULL,
             cc,
             0);
-    if (!q->cq) {
-        printf("%s: ibv_create_cq failed\n", __func__);
-        return -EINVAL;
-    }
+//    if (!q->cq) {
+//        printf("%s: ibv_create_cq failed\n", __func__);
+//        return -EINVAL;
+//    }
+//
+//    ret = ibv_req_notify_cq(q->cq, 0);
+//    if (ret) {
+//        printf("%s: ibv_req_notify_cq failed \n", __func__);
+//        return ret;
+//    }
 
-    ret = ibv_req_notify_cq(q->cq, 0);
-    if (ret) {
-        printf("%s: ibv_req_notify_cq failed \n", __func__);
-        return ret;
-    }
+	TEST_NZ((q->cq == NULL));
+	TEST_NZ(ibv_req_notify_cq(q->cq, 0));
 
     qp_attr.send_cq = q->cq;
     qp_attr.recv_cq = q->cq;
@@ -97,11 +115,13 @@ int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
     qp_attr.cap.max_send_sge = MAX_WR;
     qp_attr.cap.max_recv_sge = MAX_WR;
 
-    ret = rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
-    if (ret) {
-        printf("%s: rdma_create_qp failed\n", __func__);
-        return ret;
-    }
+//    ret = rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
+//    if (ret) {
+//        printf("%s: rdma_create_qp failed\n", __func__);
+//        return ret;
+//    }
+
+	TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
     q->qp = q->cm_id->qp;
 
 	return ret;
@@ -122,21 +142,8 @@ int rdma_modify_qp(struct queue *q)
 	return 0;
 }
 
-int rdma_create_mr(struct ibv_pd *pd)
+int rdma_server_create_mr(struct ibv_pd *pd)
 {
-#ifdef RDMA_CLIENT
-	client_mr = ibv_reg_mr(
-		pd, 
-		client_memory, 
-		sizeof(client_memory), 
-		IBV_ACCESS_LOCAL_WRITE | 
-		IBV_ACCESS_REMOTE_READ | 
-		IBV_ACCESS_REMOTE_WRITE);
-	if (!client_mr) {
-		printf("%s: ibv_reg_mr failed\n", __func__);
-		return -EINVAL;
-	}
-#else
 	server_mr = ibv_reg_mr(
 		pd, 
 		server_memory, 
@@ -148,8 +155,22 @@ int rdma_create_mr(struct ibv_pd *pd)
 		printf("%s: ibv_reg_mr failed\n", __func__);
 		return -EINVAL;
 	}
-#endif
+	return 0;
+}
 
+int rdma_client_create_mr(struct ibv_pd *pd)
+{
+        client_mr = ibv_reg_mr(
+                pd,
+                client_memory,
+                sizeof(client_memory),
+                IBV_ACCESS_LOCAL_WRITE |
+                IBV_ACCESS_REMOTE_READ |
+                IBV_ACCESS_REMOTE_WRITE);
+        if (!client_mr) {
+                printf("%s: ibv_reg_mr failed\n", __func__);
+                return -EINVAL;
+        }
 	return 0;
 }
 
@@ -191,12 +212,13 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
-
-    	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
-    	if (ret) {
-        	printf("%s: ib_post_recv failed\n", __func__);
-        	return ret;
-    	}
+//
+//    	ret = ibv_post_recv(q->qp, &wr, &bad_wr);
+//    	if (ret) {
+//        	printf("%s: ib_post_recv failed\n", __func__);
+//        	return ret;
+//    	}
+	TEST_NZ(ibv_post_recv(q->qp, &wr, &bad_wr));
 
 	return ret;
 }
@@ -224,11 +246,12 @@ int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode,
 		wr.wr.rdma.rkey = wr_mr->stag.rkey;
 	}
 
-	ret = ibv_post_send(q->qp, &wr, &bad_wr);
-	if (ret) {
-		printf("%s: ibv_post_send failed\n", __func__);
-		return ret;
-	}
+//	ret = ibv_post_send(q->qp, &wr, &bad_wr);
+//	if (ret) {
+//		printf("%s: ibv_post_send failed\n", __func__);
+//		return ret;
+//	}
 
+	TEST_NZ(ibv_post_send(q->qp, &wr, &bad_wr));
 	return ret;
 }

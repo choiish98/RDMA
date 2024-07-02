@@ -4,6 +4,6 @@
 #include "rdma_common.h"
 
 int start_rdma_server(struct sockaddr_in s_addr);
-struct queue *get_queue_server(int);
+struct queue *get_queue(int);
 
 #endif

@@ -67,7 +67,7 @@ void server_handler()
 	pthread_create(&receiver, NULL, process_receiver, NULL);
 
 	pthread_join(server_init, NULL);
-	while (rdma_server_status == RDMA_CONNECT);
+//	while (rdma_server_status == RDMA_CONNECT);
 }
 
 
