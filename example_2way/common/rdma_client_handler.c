@@ -48,7 +48,7 @@ static void *simulator(void *arg)
 //        return 0;
 //}
 
-void client_handler()
+void *client_handler()
 {
 	pthread_create(&client_init, NULL, process_client_init, NULL);
 	while (rdma_client_status != RDMA_CONNECT);

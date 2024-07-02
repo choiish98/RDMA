@@ -4,6 +4,6 @@
 #include "rdma_common.h"
 #include "rdma_server.h"
 
-void server_handler();
+void *server_handler();
 
 #endif

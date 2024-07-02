@@ -6,6 +6,6 @@
 #include "rdma_common.h"
 #include "rdma_client.h"
 
-void client_handler();
+void *client_handler();
 
 #endif
