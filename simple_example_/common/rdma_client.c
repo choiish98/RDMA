@@ -52,7 +52,7 @@ static int on_connection(struct queue *q)
 
 	printf("%s\n", __func__);
 
-	TEST_NZ(rdma_create_mr(client_session->dev->pd));
+	TEST_NZ(rdma_client_create_mr(client_session->dev->pd));
 
 	mr.addr = (uint64_t) client_mr->addr;
 	mr.length = sizeof(struct mr_attr);

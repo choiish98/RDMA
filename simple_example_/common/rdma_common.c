@@ -9,9 +9,23 @@ extern struct ibv_mr *client_mr;
 //#else
 const unsigned int MAX_SGE = 64;
 const unsigned int MAX_WR = 32;
-//extern char server_memory[PAGE_SIZE];
-//extern struct ibv_mr *server_mr;
+extern char server_memory[PAGE_SIZE];
+extern struct ibv_mr *server_mr;
 //#endif
+
+void print_sockaddr_in(const struct sockaddr_in *addr) {
+        char ip[INET_ADDRSTRLEN];
+
+        if (inet_ntop(AF_INET, &(addr->sin_addr), ip, INET_ADDRSTRLEN) == NULL) {
+                perror("inet_ntop");
+                return;
+        }
+
+        int port = ntohs(addr->sin_port);
+
+        printf("IP: %s\n", ip);
+        printf("Port: %d\n", port);
+}
 
 int rdma_alloc_session(struct ctrl **session)
 {
@@ -122,21 +136,8 @@ int rdma_modify_qp(struct queue *q)
 	return 0;
 }
 
-int rdma_create_mr(struct ibv_pd *pd)
+int rdma_server_create_mr(struct ibv_pd *pd)
 {
-#ifdef RDMA_CLIENT
-	client_mr = ibv_reg_mr(
-		pd, 
-		client_memory, 
-		sizeof(client_memory), 
-		IBV_ACCESS_LOCAL_WRITE | 
-		IBV_ACCESS_REMOTE_READ | 
-		IBV_ACCESS_REMOTE_WRITE);
-	if (!client_mr) {
-		printf("%s: ibv_reg_mr failed\n", __func__);
-		return -EINVAL;
-	}
-#else
 	server_mr = ibv_reg_mr(
 		pd, 
 		server_memory, 
@@ -148,8 +149,22 @@ int rdma_create_mr(struct ibv_pd *pd)
 		printf("%s: ibv_reg_mr failed\n", __func__);
 		return -EINVAL;
 	}
-#endif
+	return 0;
+}
 
+int rdma_client_create_mr(struct ibv_pd *pd)
+{
+        client_mr = ibv_reg_mr(
+                pd,
+                client_memory,
+                sizeof(client_memory),
+                IBV_ACCESS_LOCAL_WRITE |
+                IBV_ACCESS_REMOTE_READ |
+                IBV_ACCESS_REMOTE_WRITE);
+        if (!client_mr) {
+                printf("%s: ibv_reg_mr failed\n", __func__);
+                return -EINVAL;
+        }
 	return 0;
 }
 

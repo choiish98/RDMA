@@ -49,6 +49,20 @@ static inline int get_addr(char *sip)
 	return 0;
 }
 
+//void print_sockaddr_in(const struct sockaddr_in *addr) {
+//	char ip[INET_ADDRSTRLEN];
+//
+//	if (inet_ntop(AF_INET, &(addr->sin_addr), ip, INET_ADDRSTRLEN) == NULL) {
+//		perror("inet_ntop");
+//		return;
+//	}
+//
+//	int port = ntohs(addr->sin_port);
+//
+//	printf("IP: %s\n", ip);
+//	printf("Port: %d\n", port);
+//}
+
 static void usage(void)
 {
 	printf("[Usage] : ");
@@ -66,7 +80,8 @@ int main(int argc, char* argv[])
 				break;
 			case 'p':
 				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
-				c_addr.sin_port = htons(strtol(optarg, NULL, 0));
+//				c_addr.sin_port = htons(strtol(optarg, NULL, 0));
+				c_addr.sin_port = s_addr.sin_port;
 				break;
 			default:
 				usage();
@@ -74,10 +89,12 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (!c_addr.sin_port || !c_addr.sin_addr.s_addr) {
-		usage();
-		return 0;
-	}
+//	if (!c_addr.sin_port || !c_addr.sin_addr.s_addr) {
+//		usage();
+//		return 0;
+//	}
+
+	s_addr.sin_family = AF_INET;
 
 ////	pthread_create(&client_init, NULL, process_client_init, NULL);
 ////	while (rdma_status != RDMA_CONNECT);
@@ -96,8 +113,13 @@ int main(int argc, char* argv[])
 //	sleep(1);
 //        simulator();
 
+	printf("s_addr\n");
+	print_sockaddr_in(&s_addr);
+	printf("c_addr\n");
+	print_sockaddr_in(&c_addr);
 	server_handler();
-//	client_handler();
+	sleep(2);
+	client_handler();
 
 	return 0;
 }

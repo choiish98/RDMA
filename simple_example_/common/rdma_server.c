@@ -1,8 +1,8 @@
 #include "rdma_server.h"
 
 struct ctrl *server_session;
-struct ibv_comp_channel *s_cc;
-struct rdma_event_channel *s_ec;
+struct ibv_comp_channel *cc;
+struct rdma_event_channel *ec;
 struct rdma_cm_id *listener;
 int s_queue_ctr = 0;
 
@@ -24,7 +24,7 @@ static int on_connect_request(struct rdma_cm_id *id, struct rdma_conn_param *par
 
 	if (!q->ctrl->dev) 
 		TEST_NZ(rdma_create_device(q));
-	TEST_NZ(rdma_create_queue(q, s_cc));
+	TEST_NZ(rdma_create_queue(q, cc));
 	TEST_NZ(ibv_query_device(q->ctrl->dev->verbs, &attrs));
 
 	cm_params.initiator_depth = param->initiator_depth;
@@ -43,7 +43,7 @@ static int on_connection(struct queue *q)
 	struct mr_attr mr;
 
         printf("%s\n", __func__);
-        TEST_NZ(rdma_create_mr(server_session->dev->pd));
+        TEST_NZ(rdma_server_create_mr(server_session->dev->pd));
 
         mr.addr = (uint64_t) server_mr->addr;
         mr.length = sizeof(struct mr_attr);
@@ -68,7 +68,7 @@ static int on_disconnect(struct queue *q)
 	rdma_destroy_qp(q->cm_id);
 	ibv_destroy_cq(q->cq);
 	rdma_destroy_id(q->cm_id);
-	rdma_destroy_event_channel(s_ec);
+	rdma_destroy_event_channel(ec);
 	ibv_dealloc_pd(server_session->dev->pd);
 	free(server_session->dev);
 	server_session->dev = NULL;
@@ -96,21 +96,31 @@ static int on_event(struct rdma_cm_event *event)
 	}
 }
 
-int start_rdma_server(struct sockaddr_in s_addr)
+int start_rdma_server(struct sockaddr_in *s_addr)
 {
+
+	printf("s_addr\n");
+        print_sockaddr_in(s_addr);
+
 	struct rdma_cm_event *event;
 //	struct mr_attr mr;
 	int i;
 
 	TEST_NZ(rdma_alloc_session(&server_session));
-	s_ec = rdma_create_event_channel();
-	TEST_NZ((s_ec == NULL));
-	TEST_NZ(rdma_create_id(s_ec, &listener, NULL, RDMA_PS_TCP));
+	printf("%s: rdma_alloc_session\n", __func__);
+	ec = rdma_create_event_channel();
+	printf("%s: rdma_create_event_channel\n", __func__);
+	TEST_NZ((ec == NULL));
+	printf("%s: ec == NULL\n", __func__);
+	TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
+	printf("%s: rdma_create_id\n", __func__);
 	TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &s_addr));
+	printf("%s: rdma_bind_addr\n", __func__);
 	TEST_NZ(rdma_listen(listener, NUM_QUEUES + 1));
+	printf("%s: rdma_listen\n", __func__);
 
 //	for (i = 0; i < NUM_QUEUES; i++) {
-	while (!rdma_get_cm_event(s_ec, &event)) {
+	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
 
 		memcpy(&event_copy, event, sizeof(*event));
@@ -136,7 +146,7 @@ int start_rdma_server(struct sockaddr_in s_addr)
 
 	rdma_server_status = RDMA_CONNECT;
 
-	while (!rdma_get_cm_event(s_ec, &event)) {
+	while (!rdma_get_cm_event(ec, &event)) {
 		struct rdma_cm_event event_copy;
 
 		memcpy(&event_copy, event, sizeof(*event));

@@ -12,10 +12,12 @@ int rdma_server_status;
 atomic_int wr_check[100];
 
 
-static void *process_server_init(void *arg)
+//static void *process_server_init(void *arg)
+static void *process_server_init()
 {
         rdma_server_status = RDMA_INIT;
-        start_rdma_server(s_addr);
+        start_rdma_server(&s_addr);
+	printf("%s: Complete start_rdma_server",__func__);
 }
 
 static void *process_receiver(void *arg)
@@ -65,6 +67,7 @@ void server_handler()
 	pthread_create(&receiver, NULL, process_receiver, NULL);
 
 	pthread_join(server_init, NULL);
+	while (rdma_server_status == RDMA_CONNECT);
 }
 
 
