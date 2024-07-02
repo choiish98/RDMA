@@ -29,7 +29,7 @@ static void *process_client_init(void *arg)
 {
         rdma_client_status = RDMA_INIT;
 //	TEST_NZ(start_rdma_client(&c_addr));
-	//@delee
+ 	//@delee
 	//TODO!!!
 	// To be change &s_addr to something
 	// currently this variable for server
@@ -73,18 +73,16 @@ static inline int get_addr(char *sip)
         freeaddrinfo(info);
         return 0;
 }
-
+                                                                           
 static void *process_receiver(void *arg)
 {
-	int cpu = *(int *)arg;
-	struct queue *q = get_queue_server(cpu);
-//	struct queue *q = get_queue(0);
-//
+	struct queue *q = get_queue_server(0);
+
 	int cnt = 0;
 
-	printf("%s: start on %d\n", __func__, cpu);
+//	printf("%s: start on %d\n", __func__, cpu);
+	printf("%s: start \n", __func__);
 
-//	for (int i = 0; i < 100; i++) {
 	while(true){
 //	  	printf("%s: recv %d on %d!\n", __func__, i, cpu);
 		rdma_recv_wr(q, &q->ctrl->servermr);
@@ -154,7 +152,8 @@ int main(int argc, char* argv[])
 				break;
 			case 'p':
 				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
-				c_addr.sin_port = htons(strtol(optarg, NULL, 0));
+//				c_addr.sin_port = htons(strtol(optarg, NULL, 0));
+				c_addr.sin_port = s_addr.sin_port;
 				printf("%s: listening on port %s.\n", __func__, optarg);
 				break;
 			default:
@@ -170,38 +169,37 @@ int main(int argc, char* argv[])
 	s_addr.sin_family = AF_INET;
 
 //	//@delee
-//	pthread_create(&server_init, NULL, process_server_init, NULL);
+	pthread_create(&server_init, NULL, process_server_init, NULL);
 //
 //	printf("The client create"); 
 //	pthread_create(&client_init, NULL, process_client_init, NULL);
-//	sleep(120);
-//	while (rdma_server_status != RDMA_CONNECT);
-//	printf("The server is connected successfully\n");
+	sleep(10);
+	while (rdma_server_status != RDMA_CONNECT);
+	printf("The server is connected successfully\n");
 //	while (rdma_client_status != RDMA_CONNECT);
 //	TEST_NZ(start_rdma_client(&c_addr));
 //	printf("The client is connected successfully\n");
-//        sleep(2);
+        sleep(2);
 //
 //	//@delee
 //	// num = 0,1 for server
 //	// num = 2 for client
-//        pthread_create(&worker_s, NULL, process_worker, NULL);
-//	pthread_create(&receiver, NULL, process_receiver, NULL);
+	pthread_create(&worker_s, NULL, process_worker, NULL);
+	pthread_create(&receiver, NULL, process_receiver, NULL);
 //	pthread_create(&worker_c, NULL, simulator,NULL);
-//	printf("All workers and receiver are make successfully\n");
+	printf("All workers and receiver are make successfully\n");
 //
-//	sleep(1);
-//	pthread_join(server_init, NULL);
+	pthread_join(server_init, NULL);
 //	pthread_join(client_init, NULL);
 
-	pthread_create(&server_handler, NULL, server_maker, NULL);
-	printf("%s: make server handler", __func__);
+//	pthread_create(&server_handler, NULL, server_maker, NULL);
+//	printf("%s: make server handler", __func__);
 
-	pthread_create(&client_handler, NULL, client_maker, NULL);
-	printf("%s: make client handler", __func__);
+//	pthread_create(&client_handler, NULL, client_maker, NULL);
+//	printf("%s: make client handler", __func__);
 
 
-	pthread_join(server_handler, NULL);
-	pthread_join(client_handler, NULL);
+//	pthread_join(server_handler, NULL);
+//	pthread_join(client_handler, NULL);
 	return 0;
 }
