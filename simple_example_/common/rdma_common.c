@@ -1,17 +1,17 @@
 #include "rdma_common.h"
 
-#ifdef RDMA_CLIENT
-const unsigned int MAX_SGE = 1024;
-const unsigned int MAX_WR = 1;
+//#ifdef RDMA_CLIENT
+//const unsigned int MAX_SGE = 1024;
+//const unsigned int MAX_WR = 1;
 extern char client_memory[PAGE_SIZE];
 extern struct ibv_mr *client_mr;
-//
-#else
+////
+//#else
 const unsigned int MAX_SGE = 64;
 const unsigned int MAX_WR = 32;
-extern char server_memory[PAGE_SIZE];
-extern struct ibv_mr *server_mr;
-#endif
+//extern char server_memory[PAGE_SIZE];
+//extern struct ibv_mr *server_mr;
+//#endif
 
 int rdma_alloc_session(struct ctrl **session)
 {
