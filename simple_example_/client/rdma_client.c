@@ -111,7 +111,7 @@ int start_rdma_client(struct sockaddr_in *s_addr)
 		}
 	}
 
-//	rdma_status = RDMA_CONNECT;
+	rdma_status = RDMA_CONNECT;
 	return 0;
 }
 

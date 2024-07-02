@@ -42,9 +42,9 @@
 #define CONNECTION_TIMEOUT_MS 2000
 #define CQ_CAPACITY 128
 
-//#define RDMA_INIT 0
-//#define RDMA_CONNECT 1
-//#define RDMA_DISCONNECT 2
+#define RDMA_INIT 0
+#define RDMA_CONNECT 1
+#define RDMA_DISCONNECT 2
 
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
