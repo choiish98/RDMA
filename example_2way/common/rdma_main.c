@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
 {
 	int option;
 
-	while ((option = getopt(argc, argv, "i:p:")) != -1) {
+	while ((option = getopt(argc, argv, "i:p:P:")) != -1) {
 		switch (option) {
 			case 'i':
 				TEST_NZ(get_addr(optarg));
@@ -40,6 +40,9 @@ int main(int argc, char* argv[])
 				s_addr.sin_port = htons(strtol(optarg, NULL, 0));
 				c_addr.sin_port = s_addr.sin_port;
 				break;
+			case 'P':
+                                c_addr.sin_port = htons(strtol(optarg, NULL, 0));
+                                break;
 			default:
 				usage();
 				break;
