@@ -6,7 +6,7 @@ pthread_t worker;
 
 struct sockaddr_in s_addr;
 int rdma_status;
-extern struct ctrl client_session;
+//extern struct ctrl client_session;
 
 static void *process_client_init(void *arg)
 {
@@ -20,12 +20,21 @@ static void *simulator(void *arg)
 
 	printf("%s: start\n", __func__);
 
-        for (int i = 0; i < 100; i++) {
+	int i = 0;
+	while(true){
+		printf("%s: req %d\n", __func__, i);
                 rdma_send_wr(q, IBV_WR_SEND, &q->ctrl->servermr, NULL);
+		printf("%s: rdma_send_wr on %d\n", __func__, i);
                 rdma_poll_cq(q->cq, 1);
-                printf("%d done\n", i);
+                printf("%s: %d done\n", __func__, i);
+		i++;
+		if(i ==100){
+			break;
+			printf("%s: i is 100 in while \n", __func__);
+		}
         }
-
+	printf("%s: end of while \n", __func__);
+	
       rdma_status = RDMA_DISCONNECT;
 }
 
@@ -49,7 +58,7 @@ void client_handler()
 
 	pthread_create(&worker, NULL, simulator, NULL);
 	pthread_join(client_init, NULL);
-
+	while (rdma_status == RDMA_CONNECT);
 }
 
 
