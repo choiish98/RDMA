@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
 	print_sockaddr_in(&c_addr);
 	server_handler();
 	sleep(2);
-	client_handler();
+//	client_handler();
 
 	return 0;
 }

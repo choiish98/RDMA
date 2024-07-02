@@ -115,13 +115,13 @@ int rdma_create_queue(struct queue *q, struct ibv_comp_channel *cc)
     qp_attr.cap.max_send_sge = MAX_WR;
     qp_attr.cap.max_recv_sge = MAX_WR;
 
-//    ret = rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
-//    if (ret) {
-//        printf("%s: rdma_create_qp failed\n", __func__);
-//        return ret;
-//    }
+    ret = rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr);
+    if (ret) {
+        printf("%s: rdma_create_qp failed\n", __func__);
+        return ret;
+    }
 
-	TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
+//	TEST_NZ(rdma_create_qp(q->cm_id, q->ctrl->dev->pd, &qp_attr));
     q->qp = q->cm_id->qp;
 
 	return ret;
@@ -226,17 +226,17 @@ int rdma_recv_wr(struct queue *q, struct mr_attr *sge_mr)
 int rdma_send_wr(struct queue *q, enum ibv_wr_opcode opcode, 
 		struct mr_attr *sge_mr, struct mr_attr *wr_mr)
 {
-	struct ibv_send_wr *bad_wr;
-	struct ibv_send_wr wr;
-	struct ibv_sge sge;
+	struct ibv_send_wr *bad_wr = NULL;
+	struct ibv_send_wr wr = {};
+	struct ibv_sge sge = {};
 	int ret;
 
-	bzero(&sge, sizeof(sge));
+//	bzero(&sge, sizeof(sge));
 	sge.addr = sge_mr->addr;
 	sge.length = sge_mr->length;
 	sge.lkey = sge_mr->stag.lkey;
 
-	bzero(&wr, sizeof(wr));
+//	bzero(&wr, sizeof(wr));
 	wr.sg_list = &sge;
 	wr.num_sge = 1;
 	wr.opcode = opcode;

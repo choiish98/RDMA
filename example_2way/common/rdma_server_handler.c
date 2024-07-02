@@ -16,7 +16,7 @@ atomic_int wr_check[100];
 static void *process_server_init()
 {
         rdma_server_status = RDMA_INIT;
-        start_rdma_server(&s_addr);
+        start_rdma_server(s_addr);
 	printf("%s: Complete start_rdma_server",__func__);
 }
 

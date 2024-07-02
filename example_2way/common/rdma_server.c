@@ -96,11 +96,11 @@ static int on_event(struct rdma_cm_event *event)
 	}
 }
 
-int start_rdma_server(struct sockaddr_in *s_addr)
+int start_rdma_server(struct sockaddr_in s_addr)
 {
 
 	printf("s_addr\n");
-        print_sockaddr_in(s_addr);
+//        print_sockaddr_in(s_addr);
 
 	struct rdma_cm_event *event;
 //	struct mr_attr mr;
