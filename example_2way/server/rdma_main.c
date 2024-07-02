@@ -7,6 +7,8 @@ pthread_t client_init;
 pthread_t receiver;
 pthread_t worker_s;
 pthread_t worker_c;
+pthread_t server_handler;
+pthread_t client_handler;
 
 struct sockaddr_in s_addr;
 struct sockaddr_in c_addr;
@@ -116,6 +118,31 @@ static void usage(void)
 	exit(1);
 }
 
+//@delee
+static void *server_maker(void *arg)
+{
+        pthread_create(&server_init, NULL, process_server_init, NULL);
+        sleep(10);
+        while (rdma_server_status != RDMA_CONNECT);
+
+        pthread_create(&worker_s, NULL, process_worker, NULL);
+        pthread_create(&receiver, NULL, process_receiver, NULL);
+        sleep(1);
+        pthread_join(server_init, NULL);
+
+}
+
+static void *client_maker(void *arg)
+{
+        pthread_create(&client_init, NULL, process_client_init, NULL);
+        sleep(10);
+        while (rdma_client_status != RDMA_CONNECT);
+
+        pthread_create(&worker_c, NULL, simulator,NULL);
+        sleep(1);
+        pthread_join(client_init, NULL);
+}
+
 int main(int argc, char* argv[])
 {
 	int ret, option;
@@ -142,29 +169,40 @@ int main(int argc, char* argv[])
 	}
 	s_addr.sin_family = AF_INET;
 
-	//@delee
-	pthread_create(&server_init, NULL, process_server_init, NULL);
-	pthread_create(&client_init, NULL, process_client_init, NULL);
-	sleep(120);
-	while (rdma_server_status != RDMA_CONNECT);
-	printf("The server is connected successfully\n");
-	while (rdma_client_status != RDMA_CONNECT);
-	TEST_NZ(start_rdma_client(&c_addr));
-	printf("The client is connected successfully\n");
-        sleep(2);
+//	//@delee
+//	pthread_create(&server_init, NULL, process_server_init, NULL);
+//
+//	printf("The client create"); 
+//	pthread_create(&client_init, NULL, process_client_init, NULL);
+//	sleep(120);
+//	while (rdma_server_status != RDMA_CONNECT);
+//	printf("The server is connected successfully\n");
+//	while (rdma_client_status != RDMA_CONNECT);
+//	TEST_NZ(start_rdma_client(&c_addr));
+//	printf("The client is connected successfully\n");
+//        sleep(2);
+//
+//	//@delee
+//	// num = 0,1 for server
+//	// num = 2 for client
+//        pthread_create(&worker_s, NULL, process_worker, NULL);
+//	pthread_create(&receiver, NULL, process_receiver, NULL);
+//	pthread_create(&worker_c, NULL, simulator,NULL);
+//	printf("All workers and receiver are make successfully\n");
+//
+//	sleep(1);
+//	pthread_join(server_init, NULL);
+//	pthread_join(client_init, NULL);
 
-	//@delee
-	// num = 0,1 for server
-	// num = 2 for client
-        pthread_create(&worker_s, NULL, process_worker, NULL);
-	pthread_create(&receiver, NULL, process_receiver, NULL);
-	pthread_create(&worker_c, NULL, simulator,NULL);
-	printf("All workers and receiver are make successfully\n");
+	if (pthread_create(&server_handler, NULL, server_maker, NULL)) {
+		printf("%s: Fail to make server handler", __func__);
+		exit(0);
+	}
 
-	sleep(1);
-	pthread_join(server_init, NULL);
-	pthread_join(client_init, NULL);
-
+	if (pthread_create(&client_handler, NULL, client_maker, NULL)) {
+                printf("%s: Fail to make client handler", __func__);
+                exit(0);
+        }
 
 	return 0;
 }
