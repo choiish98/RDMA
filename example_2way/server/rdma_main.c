@@ -194,15 +194,14 @@ int main(int argc, char* argv[])
 //	pthread_join(server_init, NULL);
 //	pthread_join(client_init, NULL);
 
-	if (pthread_create(&server_handler, NULL, server_maker, NULL)) {
-		printf("%s: Fail to make server handler", __func__);
-		exit(0);
-	}
+	pthread_create(&server_handler, NULL, server_maker, NULL);
+	printf("%s: make server handler", __func__);
 
-	if (pthread_create(&client_handler, NULL, client_maker, NULL)) {
-                printf("%s: Fail to make client handler", __func__);
-                exit(0);
-        }
+	pthread_create(&client_handler, NULL, client_maker, NULL);
+	printf("%s: make client handler", __func__);
 
+
+	pthread_join(server_handler, NULL);
+	pthread_join(client_handler, NULL);
 	return 0;
 }
