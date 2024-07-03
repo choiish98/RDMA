@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
 	pthread_create(&s_handler, NULL, server_handler, NULL);
 	printf("%s: pthread_create-server_handler\n", __func__);
 	sleep(60);
-	pthread_create(&c_handler, NULL, client_handler, NULL);
+ 	pthread_create(&c_handler, NULL, client_handler, NULL);
 	printf("%s: pthread_create-client_handler\n", __func__);
 	pthread_join(s_handler, NULL);
 	sleep(5);
