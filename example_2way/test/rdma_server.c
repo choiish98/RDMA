@@ -1,24 +1,5 @@
 // rdma_server.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <infiniband/verbs.h>
-#include <rdma/rdma_cma.h>
-#include <pthread.h>
-
-#define BUFFER_SIZE 1024
-
-struct rdma_event_channel *ec;
-struct rdma_cm_id *listener, *conn;
-struct ibv_pd *pd;
-struct ibv_comp_channel *comp_chan;
-struct ibv_cq *cq;
-struct ibv_mr *recv_mr, *send_mr;
-struct ibv_qp_init_attr qp_attr;
-struct rdma_cm_event *event;
-char *recv_region, *send_region;
+#include "rdma_common.h"
 
 void* poll_cq(void *arg) {
     struct ibv_cq *cq;
@@ -89,20 +70,30 @@ void* send_thread(void *arg) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <IP> <PORT>\n", argv[0]);
+    if (argc != 5) {
+        fprintf(stderr, "Usage: %s <bind IP> <bind PORT> <peer IP> <peer PORT>\n", argv[0]);
         return 1;
     }
 
-    const char *ip = argv[1];
-    int port = atoi(argv[2]);
+    const char *bind_ip = argv[1];
+    int bind_port = atoi(argv[2]);
+    const char *peer_ip = argv[3];
+    int peer_port = atoi(argv[4]);
 
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip, &addr.sin_addr) <= 0) {
-        fprintf(stderr, "Invalid IP address: %s\n", ip);
+    struct sockaddr_in bind_addr, peer_addr;
+    memset(&bind_addr, 0, sizeof(bind_addr));
+    bind_addr.sin_family = AF_INET;
+    bind_addr.sin_port = htons(bind_port);
+    if (inet_pton(AF_INET, bind_ip, &bind_addr.sin_addr) <= 0) {
+        fprintf(stderr, "Invalid bind IP address: %s\n", bind_ip);
+        return 1;
+    }
+
+    memset(&peer_addr, 0, sizeof(peer_addr));
+    peer_addr.sin_family = AF_INET;
+    peer_addr.sin_port = htons(peer_port);
+    if (inet_pton(AF_INET, peer_ip, &peer_addr.sin_addr) <= 0) {
+        fprintf(stderr, "Invalid peer IP address: %s\n", peer_ip);
         return 1;
     }
 
@@ -112,18 +103,18 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP)) {
+    if (rdma_create_id(ec, &conn, NULL, RDMA_PS_TCP)) {
         perror("rdma_create_id");
         return 1;
     }
 
-    if (rdma_bind_addr(listener, (struct sockaddr *)&addr)) {
+    if (rdma_bind_addr(conn, (struct sockaddr *)&bind_addr)) {
         perror("rdma_bind_addr");
         return 1;
     }
 
-    if (rdma_listen(listener, 1)) {
-        perror("rdma_listen");
+    if (rdma_resolve_addr(conn, NULL, (struct sockaddr *)&peer_addr, 2000)) {
+        perror("rdma_resolve_addr");
         return 1;
     }
 
@@ -131,11 +122,27 @@ int main(int argc, char **argv) {
         perror("rdma_get_cm_event");
         return 1;
     }
-    if (event->event != RDMA_CM_EVENT_CONNECT_REQUEST) {
+
+    if (event->event != RDMA_CM_EVENT_ADDR_RESOLVED) {
         fprintf(stderr, "Unexpected event %d\n", event->event);
         return 1;
     }
-    conn = event->id;
+    rdma_ack_cm_event(event);
+
+    if (rdma_resolve_route(conn, 2000)) {
+        perror("rdma_resolve_route");
+        return 1;
+    }
+
+    if (rdma_get_cm_event(ec, &event)) {
+        perror("rdma_get_cm_event");
+        return 1;
+    }
+
+    if (event->event != RDMA_CM_EVENT_ROUTE_RESOLVED) {
+        fprintf(stderr, "Unexpected event %d\n", event->event);
+        return 1;
+    }
     rdma_ack_cm_event(event);
 
     pd = ibv_alloc_pd(conn->verbs);
@@ -175,8 +182,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (rdma_accept(conn, NULL)) {
-        perror("rdma_accept");
+    struct rdma_conn_param conn_param = {};
+    if (rdma_connect(conn, &conn_param)) {
+        perror("rdma_connect");
         return 1;
     }
 
@@ -201,9 +209,7 @@ int main(int argc, char **argv) {
     free(recv_region);
     free(send_region);
     rdma_destroy_id(conn);
-    rdma_destroy_id(listener);
     rdma_destroy_event_channel(ec);
 
     return 0;
 }
-//
