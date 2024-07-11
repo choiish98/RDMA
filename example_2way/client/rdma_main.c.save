@@ -21,6 +21,7 @@ static void *simulator(void *arg)
 	int cpu = *(int *)arg;
 	struct queue *q = get_queue(cpu);
 
+
 	printf("%s: start on %d\n", __func__, cpu);
 
 //	for (int i = 0; i <= 100; i++) {
